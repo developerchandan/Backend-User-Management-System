@@ -249,24 +249,115 @@ router.get('/quiz/all', async (req, res) => {
 //     // res.send(human);
 // })
 
-router.put('/:id', async (req, res) => {
-    const humanResource = await HumanR.findByIdAndUpdate(
+
+router.put('/:id', upload.single('image'), async (req, res) => {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+        return res.status(400).send('Invalid Product Id');
+    }
+    const category = await Category.findById(req.body.category);
+    if (!category) return res.status(400).send('Invalid Category');
+
+    const product = await HumanR.findById(req.params.id);
+    if (!product) return res.status(400).send('Invalid Product!');
+
+    // const file = req.file;
+    // let imagepath;
+
+    // if (file) {
+    //     const fileName = file.filename;
+    //     //const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
+    //     //imagepath = `${basePath}${fileName}`;
+    // } else {
+    //     imagepath = product.image;
+    // }
+
+    const updatedProduct = await HumanR.findByIdAndUpdate(
         req.params.id,
         {
-            name: req.body.quizname,
-            description: req.body.quizdescription,
-            image: result.Location,
+            name: req.body.name,
+            behaviouralAbility: req.body.behaviouralAbility,
+            behaviouralAbilityDescription: req.body.behaviouralAbilityDescription,
+            snapshotAboutStrength: req.body.snapshotAboutStrength,
+            snapshotAboutStrengthDescription: req.body.snapshotAboutStrengthDescription,
+            objective: req.body.objective,
+            objectiveDescription: req.body.objectiveDescription,
+            testProcess: req.body.testProcess,
+            testProcessDescription: req.body.testProcessDescription,
+            outcome: req.body.outcome,
+            outcomeDescription: req.body.outcomeDescription,
+            targetAudience: req.body.targetAudience,
+            targetAudienceDescription: req.body.targetAudienceDescription,
+            benefitsToIndividuals: req.body.benefitsToIndividuals,
+            benefitsToIndividualsDescription: req.body.benefitsToIndividualsDescription,
+            approach: req.body.approach,
+            approachsDescription: req.body.approachsDescription,
+            relevantTraining: req.body.relevantTraining,
+            relevantTrainingDescription: req.body.relevantTrainingDescription,
+            relevantTrainingAndDevelopment: req.body.relevantTrainingAndDevelopment,
+            relevantTrainingAndDevelopmentDescription: req.body.relevantTrainingAndDevelopmentDescription,
+            meettheExpert: req.body.meettheExpert,
+            meettheExperttDescription: req.body.meettheExperttDescription,
+    
+    
+            description: req.body.description,
+            // image: `${basePath}${fileName}`,
+            email: req.body.email,
             category: req.body.category,
-            richdescription: req.body.richdescription
+            richdescription: req.body.richdescription,
         },
         { new: true }
-    )
+    );
 
-    if (!humanResource)
-        return res.status(400).send('the humanResource cannot be created!')
+    if (!updatedProduct) return res.status(500).send('the product cannot be updated!');
 
-    res.send(humanResource);
-})
+    res.send(updatedProduct);
+});
+
+
+// router.put('/:id', async (req, res) => {
+//     const humanResource = await HumanR.findByIdAndUpdate(
+//         req.params.id,
+//         {
+//         name: req.body.name,
+//         behaviouralAbility: req.body.behaviouralAbility,
+//         behaviouralAbilityDescription: req.body.behaviouralAbilityDescription,
+//         snapshotAboutStrength: req.body.snapshotAboutStrength,
+//         snapshotAboutStrengthDescription: req.body.snapshotAboutStrengthDescription,
+//         objective: req.body.objective,
+//         objectiveDescription: req.body.objectiveDescription,
+//         testProcess: req.body.testProcess,
+//         testProcessDescription: req.body.testProcessDescription,
+//         outcome: req.body.outcome,
+//         outcomeDescription: req.body.outcomeDescription,
+//         targetAudience: req.body.targetAudience,
+//         targetAudienceDescription: req.body.targetAudienceDescription,
+//         benefitsToIndividuals: req.body.benefitsToIndividuals,
+//         benefitsToIndividualsDescription: req.body.benefitsToIndividualsDescription,
+//         approach: req.body.approach,
+//         approachsDescription: req.body.approachsDescription,
+//         relevantTraining: req.body.relevantTraining,
+//         relevantTrainingDescription: req.body.relevantTrainingDescription,
+//         relevantTrainingAndDevelopment: req.body.relevantTrainingAndDevelopment,
+//         relevantTrainingAndDevelopmentDescription: req.body.relevantTrainingAndDevelopmentDescription,
+//         meettheExpert: req.body.meettheExpert,
+//         meettheExperttDescription: req.body.meettheExperttDescription,
+
+
+//         description: req.body.description,
+//         // image: `${basePath}${fileName}`,
+//         email: req.body.email,
+//         category: req.body.category,
+//         richdescription: req.body.richdescription,
+        
+//         },
+//         { new: true }
+//     )
+
+//     if (!humanResource)
+//         return res.status(400).send('the humanResource cannot be created!')
+
+//     res.send(humanResource);
+// })
 
 router.delete('/:id', (req, res) => {
     HumanR.findByIdAndRemove(req.params.id).then(category => {
@@ -381,25 +472,25 @@ router.post('/uploadquiz', async (req, res) => {
 //     res.send(contact);
 // });
 
-router.delete('/:id', (req, res) => {
-    var id = req.params.id
-    // console.log(req.params.id);
-    Quiz.deleteOne({ _id: id }, (err) => {
-        if (err) {
-            res.json({ msg: "Somthing went wrong!!" });
-            console.log("err in delete by admin");
-        }
-    })
-    Question.deleteMany({ quizid: id }, (err) => {
-        if (err) {
-            res.json({ msg: "Somthing went wrong!!" });
-            console.log("err in delete by admin");
-        }
-    })
-    const io = req.app.get('io');
-    io.emit("quizcrud", "Quiz Curd done here");
-    res.status(200).json({ msg: "yes deleted user by admin" })
-});
+// router.delete('/:id', (req, res) => {
+//     var id = req.params.id
+//     // console.log(req.params.id);
+//     Quiz.deleteOne({ _id: id }, (err) => {
+//         if (err) {
+//             res.json({ msg: "Somthing went wrong!!" });
+//             console.log("err in delete by admin");
+//         }
+//     })
+//     Question.deleteMany({ quizid: id }, (err) => {
+//         if (err) {
+//             res.json({ msg: "Somthing went wrong!!" });
+//             console.log("err in delete by admin");
+//         }
+//     })
+//     const io = req.app.get('io');
+//     io.emit("quizcrud", "Quiz Curd done here");
+//     res.status(200).json({ msg: "yes deleted user by admin" })
+// });
 
 
 exports.verifyToken = (req, res, next) => {
