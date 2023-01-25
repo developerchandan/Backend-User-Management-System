@@ -2,6 +2,7 @@
   "name": "eshop",
   "version": "1.0.0",
   "description": "backend of the eshop",
+  "private": true,
   "main": "app.js",
   "scripts": {
     "start": "nodemon app.js",
