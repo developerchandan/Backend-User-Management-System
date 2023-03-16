@@ -39,12 +39,14 @@ router.post('/getusers', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
+    console.log(req.body);
     let user = new User({
         name: req.body.name,
         email: req.body.email,
         passwordHash: bcrypt.hashSync(req.body.password, 10),
         phone: req.body.phone,
         isAdmin: req.body.isAdmin,
+        role:req.body.role,
         isEmployer: req.body.isEmployer,
         street: req.body.street,
         apartment: req.body.apartment,
@@ -52,14 +54,36 @@ router.post('/', async (req, res) => {
         city: req.body.city,
         country: req.body.country
     });
-    user = await user.save();
+    User.find({ email: req.body.email }, (err, users) => {
+        if (err) {
+            console.log('err in finding email ');
+            res.json({ msg: 'some error!' });
+        }
+        if (users.length != 0) {
+            console.log('already user with this email');
+            res.json({ msg: 'already user exist with this email!' });
+        }
 
-    if (!user) return res.status(400).send('the user cannot be created!');
+        else {
+            user.save((error, registeredUser) => {
+                if (error) {
+                    console.log(error);
+                    res.json({ msg: "some error!" });
+                }
+                else {
+                    let payload = { subject: registeredUser._id }
+                    let token = jwt.sign(payload, 'secret')
+                    res.status(200).json({ token: token })
+                }
+            })
+        }
 
-    res.send(user);
+    });
 });
 
 router.put('/:id', async (req, res) => {
+
+    console.log(req.body);
     const userExist = await User.findById(req.params.id);
     let newPassword;
     if (req.body.password) {
@@ -157,10 +181,16 @@ router.post('/register', async (req, res) => {
     let user = new User({
         name: req.body.name,
         email: req.body.email,
-        // passwordHash: User.hashPassword(req.body.password),
         passwordHash: bcrypt.hashSync(req.body.password, 10),
         phone: req.body.phone,
         role: req.body.role,
+        isAdmin: req.body.isAdmin,
+        isEmployer: req.body.isEmployer,
+        street: req.body.street,
+        apartment: req.body.apartment,
+        zip: req.body.zip,
+        city: req.body.city,
+        country: req.body.country,
     });
     User.find({ email: req.body.email }, (err, users) => {
         if (err) {
@@ -193,6 +223,7 @@ router.post('/register', async (req, res) => {
 
     // res.send(user);
 });
+
 
 
 

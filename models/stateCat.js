@@ -1,6 +1,10 @@
+const { string } = require('joi');
 const mongoose = require('mongoose');
 
 const stateCategorySchema = mongoose.Schema({
+
+    
+
     name: {
         type: String,
         required: true,
@@ -10,7 +14,9 @@ const stateCategorySchema = mongoose.Schema({
     },
     color: { 
         type: String,
-    }
+    },
+   
+   
 })
 
 
@@ -23,3 +29,5 @@ stateCategorySchema.set('toJSON', {
 });
 
 exports.stateCategory = mongoose.model('stateCategory', stateCategorySchema);
+
+

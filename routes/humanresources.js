@@ -12,8 +12,6 @@ const jsonParser = bodyParser.json();
 
 
 
-
-
 AWS.config.update({
     secretAccessKey: process.env.AWS_ACCESS_SECRET,
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -51,9 +49,66 @@ const storage = multer.diskStorage({
 
 const uploadOptions = multer({ storage: storage });
 
+// 
+
+router.get(`/quiz/all`, async (req, res) => {
+    console.log(req.body);
+    // let filter = {};
+    // if (req.query.categories) {
+    //     filter = { category: req.query.categories.split(',') };
+    // }
+    // if (req.query.subCategories) {
+    //     filter = { ...filter, subCate: req.query.subCategories.split(',') };
+    // }
+
+    const strengthList = await HumanR.find().sort({ name: 1 }).populate('category');
+
+    if (!strengthList) {
+        res.status(500).json({ success: false });
+    }
+    res.send(strengthList);
+});
+
+// router.get(`/quiz/all`, async (req, res) => {
+//     let filter = {};
+//     if (req.query.categories) {
+//         filter = {
+//             category: { $in: req.query.categories.split(',') },
+//             'category.subCategory': { $in: req.query.subCategories.split(',') }
+//         };
+//     }
+
+//     const strengthList = await HumanR.find(filter).sort({ name: 1 }).populate('category').populate('subCategory');
+
+//     if (!strengthList) {
+//         res.status(500).json({ success: false });
+//     }
+//     res.send(strengthList);
+// });
 
 
 
+
+router.get('/:id', async (req, res) => {
+    const human = await HumanR.findById(req.params.id)
+        .populate('category');
+
+    if (!human) {
+        res.status(500).json({ message: 'The human with the given ID was not found.' })
+    }
+    res.status(200).send(human);
+})
+
+
+
+// router.get('/quiz/all', async (req, res) => {
+//     const human = await HumanR.find({}).sort({ name: 1 }).populate('category');
+
+//     if (!human) {
+//         res.status(500).json({ message: 'The human with the given ID was not found.' })
+//     }
+//     res.status(200).send(human);
+// })
 
 
 router.post('/addstrengthvalue', upload.single('file'), async (req, res) => {
@@ -85,18 +140,32 @@ router.post('/addstrengthvalue', upload.single('file'), async (req, res) => {
 
 })
 
-// router.get('/:id', async (req, res) => {
-//     const user = await User.findOne(req.params.id);
 
-//     if (!user) {
-//         res.status(500).json({ message: 'The user with the given ID was not found.' })
-//     }
-//     res.status(200).send(user);
-// })
+router.get(`/get/type/:type`, async (req, res) => {
+    console.log(req.body)
+    HumanR.find({ type: req.params.type }, (err, qz) => {
+        if (err) {
+            console.log(error);
+            res.json({ errormsg: "some error!" });
+        }
+        else {
+            res.json({ msg: qz });
+        }
+    })
+});
 
 
+
+//@ Add items..
 
 router.post('/addstrengthvalues', upload.single('image'), async (req, res) => {
+    console.log("category",req.body);
+
+     //let catID = req.body.category.split(',');
+    // let subCatID = req.body.subCategory.split(',');
+
+    // console.log(subCatID.length);
+    
 
     let params = {
         Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
@@ -104,16 +173,12 @@ router.post('/addstrengthvalues', upload.single('image'), async (req, res) => {
         Body: req.file.buffer,
     };
 
-    const category = await Category.findById(req.body.category);
-    if (!category) return res.status(400).send('Invalid Category');
-
-
     const file = req.file;
     if (!file) return res.status(400).send('No image in the request');
 
     const fileName = file.filename;
     console.log(fileName);
-    const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
+    
 
 
     whoid = req.userId;
@@ -123,36 +188,14 @@ router.post('/addstrengthvalues', upload.single('image'), async (req, res) => {
     let humanResource = new HumanR({
 
         name: req.body.name,
-
-        behaviouralAbility: req.body.behaviouralAbility,
-        behaviouralAbilityDescription: req.body.behaviouralAbilityDescription,
-        snapshotAboutStrength: req.body.snapshotAboutStrength,
-        snapshotAboutStrengthDescription: req.body.snapshotAboutStrengthDescription,
-        objective: req.body.objective,
-        objectiveDescription: req.body.objectiveDescription,
-        testProcess: req.body.testProcess,
-        testProcessDescription: req.body.testProcessDescription,
-        outcome: req.body.outcome,
-        outcomeDescription: req.body.outcomeDescription,
-        targetAudience: req.body.targetAudience,
-        targetAudienceDescription: req.body.targetAudienceDescription,
-        benefitsToIndividuals: req.body.benefitsToIndividuals,
-        benefitsToIndividualsDescription: req.body.benefitsToIndividualsDescription,
-        approach: req.body.approach,
-        approachsDescription: req.body.approachsDescription,
-        relevantTraining: req.body.relevantTraining,
-        relevantTrainingDescription: req.body.relevantTrainingDescription,
-        relevantTrainingAndDevelopment: req.body.relevantTrainingAndDevelopment,
-        relevantTrainingAndDevelopmentDescription: req.body.relevantTrainingAndDevelopmentDescription,
-        meettheExpert: req.body.meettheExpert,
-        meettheExperttDescription: req.body.meettheExperttDescription,
-
-
+        type:req.body.type,
         description: req.body.description,
-        // image: `${basePath}${fileName}`,
         email: req.body.email,
-        category: req.body.category,
+        // category: req.body.category,
+        // subCategory: req.body.subCategory,
         richdescription: req.body.richdescription,
+        isFeatured: req.body.isFeatured,
+        isHomeFeatured:req.body.isHomeFeatured,
         owner: whoid,
         owneremail: whoemail
     })
@@ -160,8 +203,6 @@ router.post('/addstrengthvalues', upload.single('image'), async (req, res) => {
 
     if (!humanResource)
         return res.status(400).send('the humanResource cannot be created!')
-
-    // res.send(humanResource);
 
     s3.upload(params, (err, result) => {
 
@@ -209,168 +250,119 @@ router.post('/getlistdata', async (req, res) => {
 
 
 
-router.get('/:id', async (req, res) => {
-    const human = await HumanR.findById(req.params.id).populate('category');
+// router.put('/:id', upload.single('image'), async (req, res) => {
+//     // console.log(req.body)
+//     // let catID = req.body.category.split(',');
+//     const updatedProduct = await HumanR.findByIdAndUpdate(
+//         req.params.id,
+//         {
+//             name: req.body.name,
+//             type:req.body.type,
+//             description: req.body.description,
+//             email: req.body.email,
+//             // category: catID,
+//             isFeatured: req.body.isFeatured,
+//             isHomeFeatured:req.body.isHomeFeatured,
+//             richdescription: req.body.richdescription,
+//         },
+//         { new: true }
+//     );
 
-    if (!human) {
-        res.status(500).json({ message: 'The human with the given ID was not found.' })
-    }
-    res.status(200).send(human);
-})
+//     if (!updatedProduct) return res.status(500).send('the Strength cannot be updated!');
 
-
-router.get('/quiz/all', async (req, res) => {
-    const human = await HumanR.find({}).sort({ name: 1 }).populate('category');
-
-    if (!human) {
-        res.status(500).json({ message: 'The human with the given ID was not found.' })
-    }
-    res.status(200).send(human);
-})
-
-
-// router.put('/:id',async (req, res)=> {
-
-//     HumanR.findOneAndUpdate({_id:req.params.id},{
-
-//         $set:{
-//             quizname: req.body.quizname,
-//             strength: req.body.strength,
-//             quizdescription: req.body.quizdescription,
-
-//         }
-
-//     })
-//     // if (!human) {
-//     //     res.status(500).json({ success: false });
-//     // }
-
-//     // console.log(human)
-//     // res.send(human);
-// })
-
-
+//     res.send(updatedProduct);
+// });
 router.put('/:id', upload.single('image'), async (req, res) => {
-    if (!mongoose.isValidObjectId(req.params.id)) {
-        return res.status(400).send('Invalid Product Id');
+  let updatedProduct = {};
+
+    if (req.file) {
+        const s3 = new AWS.S3({
+
+            secretAccessKey: process.env.AWS_ACCESS_SECRET,
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            region: process.env.AWS_REGION
+        });
+
+
+    const params = {
+      Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
+      Key: `${Date.now()}_${req.file.originalname}`,
+      Body: req.file.buffer
+    };
+
+    try {
+      const data = await s3.upload(params).promise();
+      updatedProduct.image = data.Location;
+    } catch (err) {
+      console.log(err);
+      return res.status(500).send('Error uploading image to S3');
     }
-    const category = await Category.findById(req.body.category);
-    if (!category) return res.status(400).send('Invalid Category');
+  }
 
-    const product = await HumanR.findById(req.params.id);
-    if (!product) return res.status(400).send('Invalid Product!');
+  updatedProduct.name = req.body.name;
+  updatedProduct.type = req.body.type;
+  updatedProduct.description = req.body.description;
+  updatedProduct.email = req.body.email;
+  updatedProduct.isFeatured = req.body.isFeatured;
+  updatedProduct.isHomeFeatured = req.body.isHomeFeatured;
+  updatedProduct.richdescription = req.body.richdescription;
 
-    // const file = req.file;
-    // let imagepath;
-
-    // if (file) {
-    //     const fileName = file.filename;
-    //     //const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
-    //     //imagepath = `${basePath}${fileName}`;
-    // } else {
-    //     imagepath = product.image;
-    // }
-
-    const updatedProduct = await HumanR.findByIdAndUpdate(
-        req.params.id,
-        {
-            name: req.body.name,
-            behaviouralAbility: req.body.behaviouralAbility,
-            behaviouralAbilityDescription: req.body.behaviouralAbilityDescription,
-            snapshotAboutStrength: req.body.snapshotAboutStrength,
-            snapshotAboutStrengthDescription: req.body.snapshotAboutStrengthDescription,
-            objective: req.body.objective,
-            objectiveDescription: req.body.objectiveDescription,
-            testProcess: req.body.testProcess,
-            testProcessDescription: req.body.testProcessDescription,
-            outcome: req.body.outcome,
-            outcomeDescription: req.body.outcomeDescription,
-            targetAudience: req.body.targetAudience,
-            targetAudienceDescription: req.body.targetAudienceDescription,
-            benefitsToIndividuals: req.body.benefitsToIndividuals,
-            benefitsToIndividualsDescription: req.body.benefitsToIndividualsDescription,
-            approach: req.body.approach,
-            approachsDescription: req.body.approachsDescription,
-            relevantTraining: req.body.relevantTraining,
-            relevantTrainingDescription: req.body.relevantTrainingDescription,
-            relevantTrainingAndDevelopment: req.body.relevantTrainingAndDevelopment,
-            relevantTrainingAndDevelopmentDescription: req.body.relevantTrainingAndDevelopmentDescription,
-            meettheExpert: req.body.meettheExpert,
-            meettheExperttDescription: req.body.meettheExperttDescription,
-    
-    
-            description: req.body.description,
-            // image: `${basePath}${fileName}`,
-            email: req.body.email,
-            category: req.body.category,
-            richdescription: req.body.richdescription,
-        },
-        { new: true }
-    );
-
-    if (!updatedProduct) return res.status(500).send('the product cannot be updated!');
-
-    res.send(updatedProduct);
+  try {
+    const product = await HumanR.findByIdAndUpdate(req.params.id, updatedProduct, { new: true });
+    res.send(product);
+  } catch (err) {
+    console.log(err);
+    res.status(500).send('Error updating product');
+  }
 });
 
 
-// router.put('/:id', async (req, res) => {
-//     const humanResource = await HumanR.findByIdAndUpdate(
-//         req.params.id,
-//         {
-//         name: req.body.name,
-//         behaviouralAbility: req.body.behaviouralAbility,
-//         behaviouralAbilityDescription: req.body.behaviouralAbilityDescription,
-//         snapshotAboutStrength: req.body.snapshotAboutStrength,
-//         snapshotAboutStrengthDescription: req.body.snapshotAboutStrengthDescription,
-//         objective: req.body.objective,
-//         objectiveDescription: req.body.objectiveDescription,
-//         testProcess: req.body.testProcess,
-//         testProcessDescription: req.body.testProcessDescription,
-//         outcome: req.body.outcome,
-//         outcomeDescription: req.body.outcomeDescription,
-//         targetAudience: req.body.targetAudience,
-//         targetAudienceDescription: req.body.targetAudienceDescription,
-//         benefitsToIndividuals: req.body.benefitsToIndividuals,
-//         benefitsToIndividualsDescription: req.body.benefitsToIndividualsDescription,
-//         approach: req.body.approach,
-//         approachsDescription: req.body.approachsDescription,
-//         relevantTraining: req.body.relevantTraining,
-//         relevantTrainingDescription: req.body.relevantTrainingDescription,
-//         relevantTrainingAndDevelopment: req.body.relevantTrainingAndDevelopment,
-//         relevantTrainingAndDevelopmentDescription: req.body.relevantTrainingAndDevelopmentDescription,
-//         meettheExpert: req.body.meettheExpert,
-//         meettheExperttDescription: req.body.meettheExperttDescription,
+//@ Delete items..
 
-
-//         description: req.body.description,
-//         // image: `${basePath}${fileName}`,
-//         email: req.body.email,
-//         category: req.body.category,
-//         richdescription: req.body.richdescription,
-        
-//         },
-//         { new: true }
-//     )
-
-//     if (!humanResource)
-//         return res.status(400).send('the humanResource cannot be created!')
-
-//     res.send(humanResource);
+// router.delete('/:id', (req, res) => {
+//     HumanR.findByIdAndRemove(req.params.id).then(category => {
+//         if (category) {
+//             return res.status(200).json({ success: true, message: 'the HumanR is deleted!' })
+//         } else {
+//             return res.status(404).json({ success: false, message: "HumanR not found!" })
+//         }
+//     }).catch(err => {
+//         return res.status(500).json({ success: false, error: err })
+//     })
 // })
 
-router.delete('/:id', (req, res) => {
-    HumanR.findByIdAndRemove(req.params.id).then(category => {
-        if (category) {
-            return res.status(200).json({ success: true, message: 'the HumanR is deleted!' })
-        } else {
-            return res.status(404).json({ success: false, message: "HumanR not found!" })
-        }
-    }).catch(err => {
-        return res.status(500).json({ success: false, error: err })
-    })
-})
-
+router.delete('/:id', async (req, res) => {
+    try {
+      const product = await HumanR.findById(req.params.id);
+      if (!product) {
+        return res.status(404).json({ success: false, message: 'HumanR not found' });
+      }
+  
+      if (product.image) {
+        const s3 = new AWS.S3({
+            secretAccessKey: process.env.AWS_ACCESS_SECRET,
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            region: process.env.AWS_REGION
+        });
+  
+        const key = product.image.split('/').pop(); // extract the key from the URL
+  
+        const params = {
+            Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
+            Key: key,
+        };
+  
+        await s3.deleteObject(params).promise();
+      }
+  
+      await HumanR.findByIdAndRemove(req.params.id);
+      return res.status(200).json({ success: true, message: 'HumanR deleted' });
+    } catch (err) {
+      console.log(err);
+      return res.status(500).json({ success: false, error: err });
+    }
+  });
+  
 //Add Question Section
 
 router.post('/addquestion', async (req, res) => {
@@ -418,6 +410,8 @@ router.get('/getuploadquiz', async (req, res) => {
 }
 
 )
+
+// active UploadQuiz data !
 router.post('/uploadquiz', async (req, res) => {
 
 
@@ -452,45 +446,434 @@ router.post('/uploadquiz', async (req, res) => {
 })
 
 
+// add property subcompetency Items !
+router.put('/subcompetency/:id', jsonParser, (req, res) => {
+    console.log(req.body);
+    HumanR.findOneAndUpdate({ _id: req.params.id }, {
+        $push: {
+
+            subCompetency: {
+                subcompatency_name: req.body.subcompatency_name,
+                strength_id:req.body.strength_id
+                
+            }
+
+        }
+    },
+        {new: true}
+    ).then((Result) => {
+        res.send(Result);
+    })
+        .catch((error) => {
+            res.send(error);
+        })
+
+})
+
+//Delete Subcompetency Item !
+router.delete('/deletesubcompetencyitem/:subCompetencyId', (req, res) => {
+    HumanR.findOneAndUpdate(
+        {subCompetency: {$elemMatch: {_id: req.params.subCompetencyId}}},
+        {$pull: {subCompetency: {_id: req.params.subCompetencyId}}},
+        {new: true}
+    )
+    .then((Result) => {
+        res.send(Result);
+    })
+    .catch((error) => {
+        res.send(error);
+    });
+});
+
+
+// add property SubBehaviour Items !
+// router.put('/behaviour/:id', jsonParser, (req, res) => {
+//     console.log(req.body);
+//     HumanR.findOneAndUpdate({"subCompetency._id": req.params.id }, {
+//         $push: {
+
+//             "subCompetency.$.subBeahviourList": {
+//                 beahviourName: req.body.beahviourName,
+              
+//             }
+
+//         }
+//     },
+//         {new: true}
+//     ).then((Result) => {
+//         res.send(Result);
+//     })
+//         .catch((error) => {
+//             res.send(error);
+//         })
+
+// });
+// add property subBehaviour Items !
+
+router.put('/behaviour/:id', jsonParser, (req, res) => {
+    console.log(req.body);
+    HumanR.findOneAndUpdate({"subCompetency._id": req.params.id }, {
+        $push: {
+
+            "subCompetency.$.subBeahviourList": {
+                beahviourName: req.body.beahviourName,
+              
+            }
+
+        }
+    },
+        {new: true}
+    ).then((Result) => {
+        res.send(Result);
+    })
+        .catch((error) => {
+            res.send(error);
+        })
+
+});
+
+// Delete subBeahviourList Items !
+
+router.delete('/deletebehaviouritem/:subBehaviourId', (req, res) => {
+    HumanR.findOneAndUpdate(
+        {"subCompetency.subBeahviourList._id": req.params.subBehaviourId}, 
+        {$pull: {"subCompetency.$.subBeahviourList": {_id: req.params.subBehaviourId}}}, 
+        {new: true})
+        .then((Result) => {
+            res.send(Result);
+        })
+        .catch((error) => {
+            res.send(error);
+        });
+});
 
 
 
-// router.put('/:id', async (req, res) => {
-//     const contact = await Contact.findByIdAndUpdate(
-//         req.params.id,
-//         {
-//             name: req.body.name,
-//             email: req.body.email,
-//             mobile: req.body.mobile,
-//             message: req.body.message
-//         },
-//         { new: true }
-//     );
 
-//     if (!contact) return res.status(400).send('the contact cannot be created!');
+// add property Question 
 
-//     res.send(contact);
+router.put('/question_add/:id', jsonParser, (req, res) => {
+    HumanR.findOne({"subCompetency._id": req.params.id}, {"subCompetency.$": 1}).then((humanr) => {
+      let subcomp = humanr.subCompetency[0];
+      let subBehaviours = subcomp.subBeahviourList;
+      let behaviourId = req.body.subBehaviourId;
+      let behaviour = subBehaviours.find((beh) => {
+        return beh._id == behaviourId;
+      });
+  
+      if (behaviour) {
+        let questions = behaviour.Question;
+        let q = questions.length + 1; // Define and initialize the 'q' variable
+        let question = {
+          "questionId": q,
+          "propertyid": req.body.subBehaviourId,
+          "competencyId": req.body.testID,
+          "subcompetencyid": req.params.id,
+          "questionText": req.body.questionText,
+          "answer": req.body.answer,
+          "options": req.body.options,
+        };
+  
+        HumanR.findOneAndUpdate({"subCompetency._id": req.params.id,"subCompetency.subBeahviourList._id": req.body.subBehaviourId}, {
+          $push: {
+            "subCompetency.$.subBeahviourList.$[i].Question": question
+          }
+        }, {
+          arrayFilters: [{
+            "i._id": req.body.subBehaviourId
+          }]
+        }).then((Result) => {
+          res.send(Result);
+        }).catch((error) => {
+          res.send(error);
+        })
+      } else {
+        res.send("Sub Behaviour not found");
+      }
+    }).catch((error) => {
+      res.send(error);
+    })
+  });
+  
+
+// router.put('/question_add/:id', jsonParser, (req, res) => {
+//     console.log(req.body);
+//     console.log(req.body.testID);
+//     HumanR.findOneAndUpdate({"subCompetency._id": req.params.id, "subCompetency.subBeahviourList._id": req.body.subBehaviourId }, {
+//         $push: {
+
+//             "subCompetency.$.subBeahviourList.$[i].Question": {
+//                 "questionId": q.length + 1,
+//                 "propertyid": req.body.subBehaviourId,
+//                 "competencyId":req.body.testID,
+//                 "subcompetencyid":req.params.id,
+//                 "questionText":req.body.questionText,
+//                 "answer":req.body.answer,
+//                 "options":req.body.options, 
+//             }
+//         }
+//     },
+//     {
+//         arrayFilters: [
+//             {
+//                 "i._id": req.body.subBehaviourId
+//             }
+//         ]
+//     },
+        
+//     ).then((Result) => {
+//         res.send(Result);
+//     })
+//         .catch((error) => {
+//             res.send(error);
+//         })
+
 // });
 
-// router.delete('/:id', (req, res) => {
-//     var id = req.params.id
-//     // console.log(req.params.id);
-//     Quiz.deleteOne({ _id: id }, (err) => {
-//         if (err) {
-//             res.json({ msg: "Somthing went wrong!!" });
-//             console.log("err in delete by admin");
+//Get CompetencyId !
+router.get('/getcompetencyquestion/:competencyId', async (req, res) => {
+    const competencyId = req.params.competencyId;
+
+    try {
+        const human = await HumanR.find({ "subCompetency.subBeahviourList.Question.competencyId": competencyId });
+        
+        if (human.length === 0) {
+            return res.status(404).json({ message: 'No Question found with the given competency ID.' });
+        }
+        
+        const questionList = human.flatMap(h => h.subCompetency.flatMap(s => s.subBeahviourList.flatMap(q => q.Question.filter(c => c.competencyId === competencyId))));
+        
+        res.status(200).json(questionList);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
+// Delete Get Competency Question!
+
+router.delete('/deletequestion/:id', async (req, res) => {
+    const questionId = req.params.id;
+  
+    try {
+      // Find the document that contains the question ID
+      const document = await HumanR.findOne({ 'subCompetency.subBeahviourList.Question._id': questionId });
+      if (!document) {
+        return res.status(404).json({ message: 'Question not found' });
+      }
+  
+      // Update the document to remove the question ID
+      await HumanR.updateOne(
+        { 'subCompetency.subBeahviourList.Question._id': questionId },
+        { $pull: { 'subCompetency.$[].subBeahviourList.$[].Question': { _id: questionId } } }
+      );
+  
+      return res.status(200).json({ message: 'Question deleted' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  
+// Update Get Competency Question!
+  router.put('/updatequestion/:id', async (req, res) => {
+    const questionId = req.params.id;
+    const { question, options } = req.body;
+  
+    try {
+      // Find the document that contains the question ID
+      const document = await HumanR.findOne({ 'subCompetency.subBeahviourList.Question._id': questionId });
+      if (!document) {
+        return res.status(404).json({ message: 'Question not found' });
+      }
+  
+      // Update the question and its options in the document
+      await HumanR.updateOne(
+        { 'subCompetency.subBeahviourList.Question._id': questionId },
+        { $set: { 'subCompetency.$[].subBeahviourList.$[].Question.$[question].question': question, 'subCompetency.$[].subBeahviourList.$[].Question.$[question].options': options } },
+        { arrayFilters: [{ 'question._id': questionId }] }
+      );
+  
+      return res.status(200).json({ message: 'Question updated' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  
+// Delete
+router.put('/updatequestion/:questionId', async (req, res) => {
+    const questionId = req.params.questionId;
+    
+    try {
+        // Find the HumanR document containing the question with the given questionId
+        const human = await HumanR.findOne({ "subCompetency.subBeahviourList.Question._id": questionId });
+        
+        if (!human) {
+            return res.status(404).json({ message: 'No Question found with the given ID.' });
+        }
+
+        // Find the subCompetency and subBehaviourList containing the question with the given questionId
+        let subCompetencyIndex = -1;
+        let subBehaviourListIndex = -1;
+        let questionIndex = -1;
+        human.subCompetency.forEach((subCompetency, i) => {
+            subCompetency.subBeahviourList.forEach((subBehaviourList, j) => {
+                const index = subBehaviourList.Question.findIndex(q => q._id.equals(questionId));
+                if (index !== -1) {
+                    subCompetencyIndex = i;
+                    subBehaviourListIndex = j;
+                    questionIndex = index;
+                }
+            });
+        });
+        
+        if (subCompetencyIndex === -1 || subBehaviourListIndex === -1 || questionIndex === -1) {
+            return res.status(404).json({ message: 'No Question found with the given ID.' });
+        }
+
+        // Update the question with the new data
+        const { competencyId, question, weight } = req.body;
+        human.subCompetency[subCompetencyIndex].subBeahviourList[subBehaviourListIndex].Question[questionIndex] = {
+            _id: questionId,
+            competencyId,
+            question,
+            weight
+        };
+
+        // Save the updated HumanR document
+        await human.save();
+
+        res.status(200).json({ message: 'Question updated successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.put('/removequestion/:questionId', async (req, res) => {
+    const question_Id = req.body._id;
+
+    try {
+        // Find the HumanR document containing the question with the given questionId
+        const human = await HumanR.findOne({ "subCompetency.subBeahviourList.Question._id": question_Id });
+        
+        if (!human) {
+            return res.status(404).json({ message: 'No Question found with the given ID.' });
+        }
+
+        // Find the subCompetency and subBehaviourList containing the question with the given questionId
+        let subCompetencyIndex = -1;
+        let subBehaviourListIndex = -1;
+        let questionIndex = -1;
+        human.subCompetency.forEach((subCompetency, i) => {
+            subCompetency.subBeahviourList.forEach((subBehaviourList, j) => {
+                const index = subBehaviourList.Question.findIndex(q => q._id.equals(question_Id));
+                if (index !== -1) {
+                    subCompetencyIndex = i;
+                    subBehaviourListIndex = j;
+                    questionIndex = index;
+                }
+            });
+        });
+        
+        if (subCompetencyIndex === -1 || subBehaviourListIndex === -1 || questionIndex === -1) {
+            return res.status(404).json({ message: 'No Question found with the given ID.' });
+        }
+
+        // Remove the Question subdocument from the subBeahviourList
+        human.subCompetency[subCompetencyIndex].subBeahviourList[subBehaviourListIndex].Question.splice(questionIndex, 1);
+
+        // Save the updated HumanR document
+        await human.save();
+
+        res.status(200).json({ message: `Question ${question_Id} has been removed.` });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
+        // Pull the question with the given questionId from the list of questions
+
+
+// router.delete('/delete/:_id', (req, res) => {
+//     const id = mongoose.Types.ObjectId(req.params._id);
+//     HumanR.findOneAndRemove({ "subCompetency.subBeahviourList.Question._id": id }).then(category => {
+//         if (category) {
+//             return res.status(200).json({ success: true, message: 'the HumanR is deleted!' })
+//         } else {
+//             return res.status(404).json({ success: false, message: "HumanR not found!" })
 //         }
+//     }).catch(err => {
+//         return res.status(500).json({ success: false, error: err })
 //     })
-//     Question.deleteMany({ quizid: id }, (err) => {
-//         if (err) {
-//             res.json({ msg: "Somthing went wrong!!" });
-//             console.log("err in delete by admin");
-//         }
-//     })
-//     const io = req.app.get('io');
-//     io.emit("quizcrud", "Quiz Curd done here");
-//     res.status(200).json({ msg: "yes deleted user by admin" })
-// });
+// })
+
+
+//Psychometric Upload True Get API !
+
+
+
+router.get(`/get/count`, async (req, res) => {
+    const strengthCount = await HumanR.countDocuments((count) => count);
+
+    if (!strengthCount) {
+        res.status(500).json({ success: false });
+    }
+    res.send({
+        strengthCount: strengthCount
+    });
+});
+
+router.get(`/get/home/count`, async (req, res) => {
+    const strengthCount = await HumanR.countDocuments((count) => count);
+
+    if (!strengthCount) {
+        res.status(500).json({ success: false });
+    }
+    res.send({
+        strengthCount: strengthCount
+    });
+});
+
+router.get(`/get/counts`, async (req, res) => {
+    const categoryCount = await Category.countDocuments((count) => count);
+
+    if (!categoryCount) {
+        res.status(500).json({ success: false });
+    }
+    res.send({
+        categoryCount: categoryCount
+    });
+});
+
+
+router.get(`/get/homefeatured/:count`, async (req, res) => {
+
+    const count = req.params.count ? req.params.count : 0;
+    const strengths = await HumanR.find({ isHomeFeatured: true }).limit(+count);
+
+    if (!strengths) {
+        res.status(500).json({ success: false });
+    }
+    res.send(strengths);
+});
+
+router.get(`/get/featured/:count`, async (req, res) => {
+
+    const count = req.params.count ? req.params.count : 0;
+    const strengths = await HumanR.find({ isFeatured: true }).limit(+count);
+
+    if (!strengths) {
+        res.status(500).json({ success: false });
+    }
+    res.send(strengths);
+});
 
 
 exports.verifyToken = (req, res, next) => {

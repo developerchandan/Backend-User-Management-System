@@ -3,14 +3,35 @@ const mongoose = require('mongoose');
 const categorySchema = mongoose.Schema({
     name: {
         type: String,
-        required: true,
+
     },
     icon: {
         type: String,
     },
-    color: { 
+    color: {
         type: String,
     }
+    , subCategory: [
+        {
+            subCategoryName: String,
+            subCategoryIcon: String,
+            subCategoryIcon: String,
+            
+
+            subCategoryList: [{
+                strength_id:{
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'HumanR',
+                },
+                
+              
+            }]
+        }
+    ],
+
+
+
+
 })
 
 

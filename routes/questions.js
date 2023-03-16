@@ -17,6 +17,45 @@ router.get(`/:id`, async (req, res) => {
 
 
 
+router.get('/getallquiz', async (req, res)=>{
+
+    HumanR.find({upload:true}, (err, qz) => {
+        if (err) {
+            console.log(error);
+            res.json({ msg: "some error!" });
+        }
+        else {
+            res.json({ quiz: qz });
+        }
+    })
+})
+
+
+router.get('/getallquestion/:id', async (req,res)=>{
+    Question.find({ "quizid": req.params.id }, (err, qz) => {
+        if (err) {
+            console.log(error);
+            res.json({ errormsg: "some error!" });
+        }
+        else {
+            res.json({ msg: qz });
+        }
+    })
+})
+
+
+router.get('/getGetValueById', async (req,res)=>{
+    HumanR.find({ _id: req.params.id }, (err, qz) => {
+        if (err) {
+            console.log(error);
+            res.json({ errormsg: "some error!" });
+        }
+        else {
+            res.json({ msg: qz });
+        }
+    })
+})
+
 router.delete('/:id', (req, res) => {
     var id = req.params.id
     // console.log(req.params.id);

@@ -1,128 +1,134 @@
+const { string } = require('joi');
 const mongoose = require('mongoose');
 
 const humanResource = mongoose.Schema({
-
     name: {
-        type: String,
-
+        type: String
     },
 
     email: {
-        type: String,
+        type: String
     },
     image: {
         type: String,
         default: ''
     },
-    images: [{
-        type: String
-    }],
+    images: [
+        {
+            type: String
+        }
+    ],
 
-    category: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Category',
+    category: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Category'
+        }
+    ],
 
-    },
-    description: { type: String, },
+    subCategory: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Category.subCategory'
+        }
+    ],
+
+    description: { type: String },
     richdescription: { type: String },
-    behaviouralAbility: { type: String },
-    behaviouralAbilityDescription: { type: String },
-    snapshotAboutStrength: {
-        type: String,
-    },
-    snapshotAboutStrengthDescription: { type: String },
-    objective: { type: String },
-    objectiveDescription: { type: String },
 
-    testProcess: { type: String },
-
-    testProcessDescription: { type: String },
-    outcome: { type: String, },
-    outcomeDescription: { type: String },
-    targetAudience: {
-        type: String,
-    },
-
-    targetAudienceDescription: {
-        type: String,
-
-    },
-
-    benefitsToIndividuals: {
-        type: String,
-    },
-
-    benefitsToIndividualsDescription: {
-        type: String,
-
-    },
-
-    approach: {
-        type: String,
-    },
-    approachsDescription: {
-        type: String,
-
-    },
-    relevantTraining: {
-        type: String,
-    },
-    relevantTrainingDescription: {
-        type: String,
-
-    },
-
-
-    relevantTrainingAndDevelopment: {
-        type: String,
-    },
-
-    relevantTrainingAndDevelopmentDescription: {
-        type: String,
-
-    },
-
-    meettheExpert: {
-        type: String,
-    },
-
-    meettheExperttDescription: {
-        type: String,
+    type: {
+        type: String
     },
     status: {
-        type: String,
-
+        type: String
     },
     uploadName: {
-        type: String,
-
+        type: String
     },
     upload: {
-        type: Boolean, default: false
+        type: Boolean,
+        default: true
     },
     owner: {
-        type: String,
+        type: String
     },
     owneremail: {
-        type: String,
+        type: String
     },
 
+    subCompetency: [
+        {
+            subcompatency_name: String,
+            strength_id:String,
+
+            subBeahviourList: [
+                {
+                    beahviourName: String,
+                    subcompatency_id:String,
+
+                    Question: [
+                        {
+                            propertyid: {
+                                type: String,
+                                required: true
+                            },
+                            competencyId:String,
+                            subcompetencyid: {
+                                type: String,
+                                required: true
+                            },
+                            behaviourId:{
+                                type: String,
+                                required: true
+                            },
+                            
+                            questionId: {
+                                type: String,
+                                required: true
+                            },
+                            questionText:{
+                                type: String, 
+                                required: true
+                            },
+                            answer: {
+                                type: String,
+                                required: true
+                            },
+                            options:[{
+                                scale:String,
+                                value:String,
+                                analysis:String,
+                                comments:[]
+                            }]
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+
+    isFeatured: {
+        type: Boolean,
+        default: false
+    },
+
+    isHomeFeatured:{
+        type: Boolean,
+        default: false
+    },
     dateCreated: {
         type: Date,
-        default: Date.now,
+        default: Date.now
     },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-
-
-})
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+});
 
 humanResource.virtual('id').get(function () {
     return this._id.toHexString();
-})
-
-humanResource.set('toJSON', {
-    virtuals: true,
 });
 
+humanResource.set('toJSON', {
+    virtuals: true
+});
 
 exports.HumanR = mongoose.model('HumanR', humanResource);
