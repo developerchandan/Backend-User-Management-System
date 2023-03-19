@@ -57,7 +57,6 @@ router.get('/getblogsList', async (req, res) => {
     res.status(200).send(blog);
 })
 
-
 router.get('/:id', async (req, res) => {
     const blog = await Blog.findById(req.params.id);
       
@@ -134,22 +133,62 @@ router.post('/addblog', upload.single('image'), async (req, res) => {
 
 
 
+// router.put('/:id', upload.single('image'), async (req, res) => {
+
+//     const updatedBlog = await Blog.findByIdAndUpdate(
+//         req.params.id,
+//         {
+//         name: req.body.name,
+//         description: req.body.description,
+//         richdescription: req.body.richdescription,
+//         },
+//         { new: true }
+//     );
+
+//     if (!updatedBlog) return res.status(500).send('the Blog cannot be updated!');
+
+//     res.send(updatedBlog);
+// });
+
 router.put('/:id', upload.single('image'), async (req, res) => {
-
-    const updatedBlog = await Blog.findByIdAndUpdate(
-        req.params.id,
-        {
-        name: req.body.name,
-        description: req.body.description,
-        richdescription: req.body.richdescription,
-        },
-        { new: true }
-    );
-
-    if (!updatedBlog) return res.status(500).send('the Blog cannot be updated!');
-
-    res.send(updatedBlog);
-});
+    let updatedBlog = {};
+  
+      if (req.file) {
+          const s3 = new AWS.S3({
+  
+              secretAccessKey: process.env.AWS_ACCESS_SECRET,
+              accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+              region: process.env.AWS_REGION
+          });
+  
+  
+      const params = {
+        Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
+        Key: `${Date.now()}_${req.file.originalname}`,
+        Body: req.file.buffer
+      };
+  
+      try {
+        const data = await s3.upload(params).promise();
+        updatedBlog.image = data.Location;
+      } catch (err) {
+        console.log(err);
+        return res.status(500).send('Error uploading image to S3');
+      }
+    }
+  
+    updatedBlog.name = req.body.name;
+    updatedBlog.description = req.body.description;
+    updatedBlog.richdescription = req.body.richdescription;
+  
+    try {
+      const blog = await Blog.findByIdAndUpdate(req.params.id, updatedBlog, { new: true });
+      res.send(blog);
+    } catch (err) {
+      console.log(err);
+      res.status(500).send('Error updating Blog');
+    }
+  });
 
 
 //@ Delete items..

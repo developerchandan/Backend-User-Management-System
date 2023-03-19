@@ -1,4 +1,4 @@
-const { Contact } = require('../models/contact');
+const { Profile } = require('../models/profile');
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
@@ -10,36 +10,6 @@ const openaiConfig = new Configuration({
   });
   
   const openai = new OpenAIApi(openaiConfig);
-  
-//   router.post('/api/chatgpt', async (req, res) => {
-//     console.log(req.body);
-//     const prompt = req.body.prompt;
-//     const model = req.body.model;
-//     const maxTokens = req.body.maxTokens;
-//     const temperature=req.body.temperature;
-//     const top_p=req.body.top_p;
-//     const frequency_penalty=req.body.frequency_penalty;
-//     const presence_penalty=req.body.presence_penalty;
-  
-//     const response = await openai.createCompletion({
-//       model: model,
-//       prompt: prompt,
-//       max_tokens: maxTokens,
-//       temperature:temperature,
-//       top_p:top_p,
-//       frequency_penalty:frequency_penalty,
-//       presence_penalty:presence_penalty,
-//     })
-  
-//     // res.send(response);
-//     .then((response) => {
-//         console.log(response);
-//             res.status(200).send(response.data.choices[0].text);
-//           }).catch((error) => {
-//             res.status(500).send(error);
-//           });
-//   });
-
 router.post('/api/chatgpt', async (req, res) => {
     console.log(req.body);
     const prompt = req.body.prompt;
@@ -71,52 +41,72 @@ router.post('/api/chatgpt', async (req, res) => {
   
 
 router.get(`/`, async (req, res) => {
-    const contact = await Contact.find();
+    const profile = await Profile.find();
 
-    if (!contact) {
+    if (!profile) {
         res.status(500).json({ success: false });
     }
-    res.status(200).send(contact);
+    res.status(200).send(profile);
 });
 
-router.get('/:id', async (req, res) => {
-    const contact = await Contact.findById(req.params.id);
 
-    if (!contact) {
-        res.status(500).json({ message: 'The contact with the given ID was not found.' });
-    }
-    res.status(200).send(contact);
+  
+//   router.post('/getuserdata', async (req, res) => {
+//     try {
+//       const email = req.body.email;
+//       const profile = await Profile.findOne({ email: email });
+  
+//       if (!profile) return res.status(404).send('Profile not found');
+  
+//       res.send(profile);
+//     } catch (err) {
+//       console.error(err.message);
+//       res.status(500).send('Server Error');
+//     }
+//   });
+  
+  router.post('/getuserdata', async (req, res) => {
+    Profile.find({ email: req.body.email }).then((result) => {
+        res.send({ data: result, status: 'success' })
+    }).catch((e) => {
+        res.send(e);
+    })
 });
+
 
 router.post('/', async (req, res) => {
-    let contact = new Contact({
-        name: req.body.name,
+    let profile = new Profile({
+        currentRole: req.body.currentRole,
         email: req.body.email,
-        mobile: req.body.mobile,
-        message: req.body.message
+        KRAs: req.body.KRAs,
+        KPIs: req.body.KPIs,
+        futureRole:req.body.futureRole,
+        selfAssessment:req.body.selfAssessment
     });
-    contact = await contact.save();
+    profile = await profile.save();
 
-    if (!contact) return res.status(400).send('the contact cannot be created!');
+    if (!profile) return res.status(400).send('the profile cannot be created!');
 
-    res.send(contact);
+    res.send(profile);
 });
 
 router.put('/:id', async (req, res) => {
-    const contact = await Contact.findByIdAndUpdate(
+    const profile = await Profile.findByIdAndUpdate(
         req.params.id,
         {
-            name: req.body.name,
-            email: req.body.email,
-            mobile: req.body.mobile,
-            message: req.body.message
+            currentRole: req.body.currentRole,
+        email: req.body.email,
+        KRAs: req.body.KRAs,
+        KPIs: req.body.KPIs,
+        futureRole:req.body.futureRole,
+        selfAssessment:req.body.selfAssessment
         },
         { new: true }
     );
 
-    if (!contact) return res.status(400).send('the contact cannot be created!');
+    if (!profile) return res.status(400).send('the profile cannot be created!');
 
-    res.send(contact);
+    res.send(profile);
 });
 
 router.delete('/:id', (req, res) => {

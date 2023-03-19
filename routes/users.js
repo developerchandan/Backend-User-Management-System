@@ -7,6 +7,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Router } = require('express');
 var sendMail = require('../mail/mail')
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client('378973160613-88i6br7bfkfa4tpuvus266rhnlen99gq.apps.googleusercontent.com');
+
+// Import the necessary modules
+const axios = require('axios');
+const qs = require('qs');
 
 router.get(`/`, async (req, res) => {
     const userList = await User.find().select('-passwordHash');
@@ -176,6 +182,103 @@ router.post('/login', (req, res) => {
 
 })
 
+
+// Define the Google Login route
+router.post('/google-login', async (req, res) => {
+    console.log(req.body);
+    const { token } = req.body;
+    try {
+      // Verify the Google ID token
+      const ticket = await client.verifyIdToken({
+        idToken: token,
+        audience: '378973160613-88i6br7bfkfa4tpuvus266rhnlen99gq.apps.googleusercontent.com'
+      });
+  
+      // Get the user's information from the token
+      const { name, email, picture } = ticket.getPayload();
+  
+      // Check if the user is already registered
+      let user = await User.findOne({ email });
+  
+      if (!user) {
+        // If the user is new, create a new user account
+        user = new User({
+          name,
+          email,
+          profilePicture: picture
+        });
+        await user.save();
+      }
+  
+      // Generate a JWT token for the user
+      const payload = { subject: user._id, email };
+      const jwtToken = jwt.sign(payload, 'secret');
+  
+      // Send the token and user information back to the client
+      res.status(200).send({
+        token: jwtToken,
+        role: user.role,
+        email: user.email,
+        name: user.name,
+        contact: user.phone,
+        profilePicture: user.profilePicture
+      });
+    } catch (error) {
+      console.log(error);
+      res.status(500).send({ msg: 'Something went wrong' });
+    }
+  });
+
+
+  // Define the Facebook Login route
+router.post('/facebook-login', async (req, res) => {
+    console.log(req.body);
+    const { accessToken, userID } = req.body;
+    try {
+      // Get the user's information from Facebook
+      const fields = 'id,name,email,picture.type(large)';
+      const url = `https://graph.facebook.com/${userID}?fields=${fields}&access_token=${accessToken}`;
+      const response = await axios.get(url);
+      const { name, email, picture } = response.data;
+  
+      // Check if the user is already registered
+      let user = await User.findOne({ email });
+  
+      if (!user) {
+        // If the user is new, create a new user account
+        user = new User({
+          name,
+          email,
+          role: 'simpleUser', // Set the user's role
+          profilePicture: picture.data.url
+        });
+        await user.save();
+      } else {
+        // If the user already exists, update their role
+        user.role = 'simpleUser'; // Set the user's role
+        await user.save();
+      }
+      
+      // Generate a JWT token for the user
+      const payload = { subject: user._id, email };
+      const jwtToken = jwt.sign(payload, 'secret');
+  
+      // Send the token and user information back to the client
+      res.status(200).send({
+        token: jwtToken,
+        role: user.role,
+        email: user.email,
+        name: user.name,
+        contact: user.phone,
+        profilePicture: user.profilePicture
+      });
+    } catch (error) {
+      console.log(error);
+      res.status(500).send({ msg: 'Something went wrong' });
+    }
+  });
+  
+  
 router.post('/register', async (req, res) => {
     console.log(req.body);
     let user = new User({
