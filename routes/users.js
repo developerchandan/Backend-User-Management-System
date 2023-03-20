@@ -6,6 +6,8 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Router } = require('express');
+const AWS = require('aws-sdk');
+const multer = require('multer');
 var sendMail = require('../mail/mail')
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client('378973160613-88i6br7bfkfa4tpuvus266rhnlen99gq.apps.googleusercontent.com');
@@ -14,6 +16,30 @@ const client = new OAuth2Client('378973160613-88i6br7bfkfa4tpuvus266rhnlen99gq.a
 const axios = require('axios');
 const qs = require('qs');
 
+
+// Configure the AWS SDK with your credentials
+AWS.config.update({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_ACCESS_SECRET,
+    region: process.env.AWS_REGION
+  });
+  
+  // Create an instance of the S3 service
+  const s3 = new AWS.S3();
+
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5242880 }, // 5 MB
+    fileFilter: function(req, file, cb) {
+      // Check if the file is an image
+      if (!file.mimetype.startsWith('image/')) {
+        return cb(new Error('Only image files are allowed!'), false);
+      }
+      cb(null, true);
+    }
+  });
+
+  
 router.get(`/`, async (req, res) => {
     const userList = await User.find().select('-passwordHash');
 
@@ -121,33 +147,6 @@ router.put('/:id', async (req, res) => {
     res.send(user);
 });
 
-// router.post('/user-login', async (req, res) => {
-//     const user = await User.findOne({ email: req.body.email });
-//     const secret = process.env.secret;
-//     if (!user) {
-//         return res.status(400).send('The user not found');
-//     }
-
-//     if (user && bcrypt.compareSync(req.body.password, user.passwordHash)) {
-//         const token = jwt.sign(
-//             {
-//                 userId: user.id,
-//                 isAdmin: user.isAdmin
-//             },
-//             secret,
-//             { expiresIn: '1d' }
-//         );
-
-//         res.status(200).send({
-//             user: user.email,
-//             role: user.role,
-//             email: user.email,
-//             token: token
-//         });
-//     } else {
-//         res.status(400).send('password is wrong!');
-//     }
-// });
 
 router.post('/login', (req, res) => {
     User.findOne({ email: req.body.email }, (err, user) => {
@@ -205,8 +204,13 @@ router.post('/google-login', async (req, res) => {
         user = new User({
           name,
           email,
-          profilePicture: picture
+          role: 'simpleUser', // Set the user's role
+        //   profilePicture: picture.data.url
         });
+        await user.save();
+      } else {
+        // If the user already exists, update their role
+        user.role = 'simpleUser'; // Set the user's role
         await user.save();
       }
   
@@ -328,7 +332,53 @@ router.post('/register', async (req, res) => {
 });
 
 
-
+router.put('/:id', upload.single('image'), async (req, res) => {
+    try {
+      // Find the user by ID
+      const user = await User.findById(req.params.id);
+  
+      // Update the user properties
+      user.name = req.body.name;
+      user.email = req.body.email;
+      user.phone = req.body.phone;
+      user.isAdmin = req.body.isAdmin;
+      user.role = req.body.role;
+      user.isEmployer = req.body.isEmployer;
+      user.street = req.body.street;
+      user.apartment = req.body.apartment;
+      user.zip = req.body.zip;
+      user.city = req.body.city;
+      user.country = req.body.country;
+  
+      // Check if a new image file was uploaded
+      if (req.file) {
+        // Set the S3 bucket and file key
+        const bucketName = '<YOUR_S3_BUCKET_NAME>';
+        const fileKey = `user/${user._id}/profile.jpg`;
+  
+        // Upload the file to S3
+        const params = {
+          Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
+          Key: req.file.originalname,
+          Body: req.file.buffer,
+          ContentType: req.file.mimetype
+        };
+        const uploadResult = await s3.upload(params).promise();
+  
+        // Update the user image URL
+        user.image = uploadResult.Location;
+      }
+  
+      // Save the updated user to the database
+      await user.save();
+  
+      res.status(200).json({ msg: 'User profile updated successfully!' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ msg: 'Internal server error' });
+    }
+  });
+  
 
 
 ///Get Email

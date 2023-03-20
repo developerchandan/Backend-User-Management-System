@@ -44,8 +44,6 @@ const blogRoutes = require('./routes/blogs');
 const galleryRoutes = require('./routes/gallerys');
 const testtypeRoutess = require('./routes/testtypes');
 const profileRoutess = require('./routes/profiles');
-const authRoutess = require('./routes/auth');
-
 
 const api = process.env.API_URL;
 
@@ -64,7 +62,7 @@ app.use(`${api}/blogs`, blogRoutes);
 app.use(`${api}/gallery`, galleryRoutes);
 app.use(`${api}/testtype`, testtypeRoutess);
 app.use(`${api}/profile`, profileRoutess);
-app.use(`${api}/auth`, authRoutess);
+
 
 
 
