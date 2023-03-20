@@ -35,6 +35,7 @@ const humanRoutess = require('./routes/humanresources');
 const questionRoutess = require('./routes/questions');
 const subcategoryRoutess = require('./routes/sub_categorys');
 const blogRoutes = require('./routes/blogs');
+const privacyPolicyRoutes = require('./routes/privacypolicys');
 const galleryRoutes = require('./routes/gallerys');
 const testtypeRoutess = require('./routes/testtypes');
 
@@ -48,6 +49,7 @@ app.use(`${api}/strength`, humanRoutess);
 app.use(`${api}/question`, questionRoutess);
 app.use(`${api}/subcategory`, subcategoryRoutess);
 app.use(`${api}/blogs`, blogRoutes);
+app.use(`${api}/privacy`, privacyPolicyRoutes);
 app.use(`${api}/gallery`, galleryRoutes);
 app.use(`${api}/testtype`, testtypeRoutess);
 
