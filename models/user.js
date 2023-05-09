@@ -46,7 +46,15 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
-
+    userId:{
+        type: String,
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now // Set default value to current date and time
+    },
+    loginAttempts: { type: Number, default: 0 },
+    lastFailedLoginAttempt: { type: Date, default: null },
 }, { timestamp: true });
 
 userSchema.statics.hashPassword = function hashPassword(passwordHash) {

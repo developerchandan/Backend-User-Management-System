@@ -10,7 +10,15 @@ const { User } = require('../models/user');
 const bodyParser = require("body-parser");
 const jsonParser = bodyParser.json();
 
+const axios = require('axios');
+const { Configuration, OpenAIApi } = require('openai');
 
+
+const openaiConfig = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  
+  const openai = new OpenAIApi(openaiConfig);
 
 AWS.config.update({
     secretAccessKey: process.env.AWS_ACCESS_SECRET,
@@ -595,7 +603,47 @@ router.put('/question_add/:id', jsonParser, (req, res) => {
     })
   });
   
+// add property Question Summary !
 
+router.put('/summary_add/:id', jsonParser, (req, res) => {
+    console.log(req.body);
+    HumanR.findOne({"subCompetency._id": req.params.id}, {"subCompetency.$": 1}).then((humanr) => {
+      let subcomp = humanr.subCompetency[0];
+      let subBehaviours = subcomp.subBeahviourList;
+      let behaviourId = req.body.subBehaviourId;
+      let behaviour = subBehaviours.find((beh) => {
+        return beh._id == behaviourId;
+      });
+  
+      if (behaviour) {
+       
+        let summary = {
+          "title": req.body.title,
+          "description": req.body.description,
+          "range":req.body.range,
+        };
+  
+        HumanR.findOneAndUpdate({"subCompetency._id": req.params.id,"subCompetency.subBeahviourList._id": req.body.subBehaviourId}, {
+          $push: {
+            "subCompetency.$.subBeahviourList.$[i].summary": summary
+          }
+        }, {
+          arrayFilters: [{
+            "i._id": req.body.subBehaviourId
+          }]
+        }).then((Result) => {
+          res.send(Result);
+        }).catch((error) => {
+          res.send(error);
+        })
+      } else {
+        res.send("Sub Behaviour not found");
+      }
+    }).catch((error) => {
+      res.send(error);
+    })
+  });
+  
 // router.put('/question_add/:id', jsonParser, (req, res) => {
 //     console.log(req.body);
 //     console.log(req.body.testID);
@@ -629,6 +677,42 @@ router.put('/question_add/:id', jsonParser, (req, res) => {
 //         })
 
 // });
+router.get('/questions/:subcompetencyid', (req, res) => {
+    let subcompetencyid = req.params.subcompetencyid;
+  
+    HumanR.findOne({"subCompetency._id": subcompetencyid}, {"subCompetency.$": 1}).then((humanr) => {
+      let subcomp = humanr.subCompetency[0];
+      let subcompName = subcomp.name;
+      let subBehaviours = subcomp.subBeahviourList;
+  
+      // Create an empty array to hold the questions
+      let questionsArr = [];
+  
+      // Iterate over the subBehaviours and their questions
+      subBehaviours.forEach((behaviour) => {
+        let questions = behaviour.Question;
+  
+        // Iterate over the questions and add them to the questionsArr array
+        questions.forEach((question) => {
+          questionsArr.push(question);
+        });
+      });
+  
+      // Create an object to hold the subcompetency name and questions array
+      let result = {
+        subcompetency_name: subcompName,
+        questions: questionsArr
+      };
+  
+      // Return the result object as the response
+      res.send(result);
+    }).catch((error) => {
+      console.log(error);
+      res.send("Error fetching questions");
+    });
+  });
+  
+  
 
 //Get CompetencyId !
 router.get('/getcompetencyquestion/:competencyId', async (req, res) => {
@@ -875,7 +959,34 @@ router.get(`/get/featured/:count`, async (req, res) => {
     res.send(strengths);
 });
 
-
+router.post('/api/analysis-result', async (req, res) => {
+    console.log(req.body);
+    const prompt = req.body.prompt;
+    const model = "text-davinci-003";
+    const maxTokens = 256 || 1024; // Increase the default to 1024
+    const temperature=0.7;
+    const top_p=1;
+    const frequency_penalty=0;
+    const presence_penalty=0;
+  
+    try {
+      const response = await openai.createCompletion({
+        model: model,
+        prompt: prompt,
+        max_tokens: maxTokens,
+        temperature:temperature,
+        top_p:top_p,
+        frequency_penalty:frequency_penalty,
+        presence_penalty:presence_penalty,
+      });
+    const generatedText = response.data.choices[0].text;
+    console.log(generatedText); // Print the generated text to the console
+    res.status(200).send(generatedText);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send(error);
+  }
+  });
 exports.verifyToken = (req, res, next) => {
     if (!req.headers.authorization) {
         return res.status(401).send("unauthorized req")

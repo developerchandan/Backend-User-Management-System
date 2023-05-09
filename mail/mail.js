@@ -19,7 +19,8 @@ function sendEmail(to,otp) {
         from: 'info@jobluu.com',
         to: to,
         // cc:cc,
-        subject: 'Reset Password Jobluu!!',
+        subject: 'Reset Password Link Jobluu!!',
+         html: `Click <a href="http://localhost:4200/#/reset-password/${otp}">here</a> to reset your password`,
         text: str
     };
 

@@ -1,4 +1,5 @@
 const { Contact } = require('../models/contact');
+const { Newsletter } = require('../models/newsletter');
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
@@ -92,8 +93,10 @@ router.post('/', async (req, res) => {
     let contact = new Contact({
         name: req.body.name,
         email: req.body.email,
-        mobile: req.body.mobile,
-        message: req.body.message
+        contact: req.body.contact,
+        message: req.body.message,
+        company:req.body.company,
+        isPrivacyPolicy:req.body.isPrivacyPolicy
     });
     contact = await contact.save();
 
@@ -108,8 +111,10 @@ router.put('/:id', async (req, res) => {
         {
             name: req.body.name,
             email: req.body.email,
-            mobile: req.body.mobile,
-            message: req.body.message
+            contact: req.body.contact,
+            message: req.body.message,
+            company:req.body.company,
+            isPrivacyPolicy:req.body.isPrivacyPolicy
         },
         { new: true }
     );
@@ -132,6 +137,42 @@ router.delete('/:id', (req, res) => {
             return res.status(500).json({ success: false, error: err });
         });
 });
+
+
+// Subscribe our newsletter
+router.get('/check-subscription/:newsletter', async (req, res) => {
+    try {
+      const newsletter = await Newsletter.findOne({ newsletter: req.params.newsletter });
+      if (newsletter) {
+        // User is already subscribed
+        res.send({ subscribed: true });
+      } else {
+        // User is not subscribed
+        res.send({ subscribed: false });
+      }
+    } catch (error) {
+      console.log(error);
+      res.status(500).send('Failed to check subscription.');
+    }
+  });
+
+  // Check if a user is subscribed to the newsletter
+router.post('/add-newsletter', async (req, res) => {
+    let existingNewsletter = await Newsletter.findOne({ newsletter: req.body.newsletter });
+    if (existingNewsletter) {
+        return res.status(400).send('You have already subscribed to the newsletter.');
+    }
+
+    let newsletter = new Newsletter({
+        newsletter: req.body.newsletter
+    });
+    newsletter = await newsletter.save();
+
+    if (!newsletter) return res.status(400).send('The newsletter cannot be created!');
+
+    res.send(newsletter);
+});
+
 
 
 

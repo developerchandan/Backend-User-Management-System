@@ -45,6 +45,11 @@ const privacyPolicyRoutes = require('./routes/privacypolicys');
 const galleryRoutes = require('./routes/gallerys');
 const testtypeRoutess = require('./routes/testtypes');
 const profileRoutess = require('./routes/profiles');
+const industryRoutess = require('./routes/industrys');
+const departmentRoutess = require('./routes/departments');
+const designationRoutess = require('./routes/designations');
+const quiz_categoryRoutess = require('./routes/quiz-categorys');
+const quizRoutess = require('./routes/quizs');
 
 const api = process.env.API_URL;
 
@@ -64,6 +69,11 @@ app.use(`${api}/privacy`, privacyPolicyRoutes);
 app.use(`${api}/gallery`, galleryRoutes);
 app.use(`${api}/testtype`, testtypeRoutess);
 app.use(`${api}/profile`, profileRoutess);
+app.use(`${api}/industry`, industryRoutess);
+app.use(`${api}/department`, departmentRoutess);
+app.use(`${api}/designation`, designationRoutess);
+app.use(`${api}/quiz_category`, quiz_categoryRoutess);
+app.use(`${api}/quiz`, quizRoutess);
 
 
 

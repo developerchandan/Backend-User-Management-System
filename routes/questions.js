@@ -1,5 +1,5 @@
 const { Question } = require('../models/question');
-const { HumanR } = require('../models/humanresource');
+const { QuizList } = require('../models/quiz');
 const express = require('express');
 const router = express.Router();
 
@@ -19,7 +19,7 @@ router.get(`/:id`, async (req, res) => {
 
 router.get('/getallquiz', async (req, res)=>{
 
-    HumanR.find({upload:true}, (err, qz) => {
+    QuizList.find({upload:true}, (err, qz) => {
         if (err) {
             console.log(error);
             res.json({ msg: "some error!" });
@@ -45,7 +45,7 @@ router.get('/getallquestion/:id', async (req,res)=>{
 
 
 router.get('/getGetValueById', async (req,res)=>{
-    HumanR.find({ _id: req.params.id }, (err, qz) => {
+    QuizList.find({ _id: req.params.id }, (err, qz) => {
         if (err) {
             console.log(error);
             res.json({ errormsg: "some error!" });
@@ -59,7 +59,7 @@ router.get('/getGetValueById', async (req,res)=>{
 router.delete('/:id', (req, res) => {
     var id = req.params.id
     // console.log(req.params.id);
-    HumanR.deleteOne({ _id: id }, (err) => {
+    QuizList.deleteOne({ _id: id }, (err) => {
         if (err) {
             res.json({ msg: "Somthing went wrong!!" });
             console.log("err in delete by admin");

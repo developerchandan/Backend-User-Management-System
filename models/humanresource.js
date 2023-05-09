@@ -101,6 +101,13 @@ const humanResource = mongoose.Schema({
                                 comments:[]
                             }]
                         }
+                    ],
+                    summary:[
+                        {
+                            title:String,
+                            description:String,
+                            range:String,
+                        }
                     ]
                 }
             ]

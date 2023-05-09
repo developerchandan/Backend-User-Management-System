@@ -38,6 +38,9 @@ const blogRoutes = require('./routes/blogs');
 const privacyPolicyRoutes = require('./routes/privacypolicys');
 const galleryRoutes = require('./routes/gallerys');
 const testtypeRoutess = require('./routes/testtypes');
+const industryRoutess = require('./routes/industrys');
+const departmentRoutess = require('./routes/departments');
+const designationRoutess = require('./routes/designations');
 
 app.use(`${api}/categories`, categoriesRoutes);
 app.use(`${api}/products`, productsRoutes);
@@ -52,6 +55,9 @@ app.use(`${api}/blogs`, blogRoutes);
 app.use(`${api}/privacy`, privacyPolicyRoutes);
 app.use(`${api}/gallery`, galleryRoutes);
 app.use(`${api}/testtype`, testtypeRoutess);
+app.use(`${api}/industry`, industryRoutess);
+app.use(`${api}/department`, departmentRoutess);
+app.use(`${api}/designation`, designationRoutess);
 
 app.use(`${api}/subcategory`, subcategoryRoutess);
 app.get('/home',(req,res)=>{

@@ -72,6 +72,19 @@ router.post('/', async (req,res)=>{
     res.send(category);
 })
 
+// router.post('/', async (req, res) => {
+//     try {
+//       const category = await Category.create({
+//         name: req.body.name,
+//         icon: req.body.icon,
+//         color: req.body.color
+//       });
+//       res.status(201).json({ message: 'Create category Sussfully' });
+//     } catch (err) {
+//       console.error(err);
+//       res.status(400).json({ message: 'Failed to create category' });
+//     }
+//   });
 
 router.put('/:id',async (req, res)=> {
     const category = await Category.findByIdAndUpdate(

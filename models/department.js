@@ -1,19 +1,21 @@
 const mongoose = require('mongoose');
 
 
-const industrySchema = new mongoose.Schema({
+const departmentSchema = new mongoose.Schema({
     name: String,
     icon: String,
     color: String,
     date: { type: Date, default: Date.now }
 
 })
-industrySchema.virtual('id').get(function () {
+
+departmentSchema.virtual('id').get(function () {
     return this._id.toHexString();
 });
 
-industrySchema.set('toJSON', {
+departmentSchema.set('toJSON', {
     virtuals: true,
 });
 
-exports.Industries = mongoose.model("Industries", industrySchema);
+
+exports.Department = mongoose.model("Department", departmentSchema);

@@ -8,10 +8,13 @@ const jwt = require('jsonwebtoken');
 const { Router } = require('express');
 const AWS = require('aws-sdk');
 const multer = require('multer');
-var sendMail = require('../mail/mail')
+const crypto = require('crypto');
+var sendMail = require('../mail/mail');
+const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client('378973160613-88i6br7bfkfa4tpuvus266rhnlen99gq.apps.googleusercontent.com');
 
+const { ObjectId } = require('mongodb');
 // Import the necessary modules
 const axios = require('axios');
 const qs = require('qs');
@@ -73,6 +76,7 @@ router.post('/getusers', async (req, res) => {
 router.post('/', async (req, res) => {
     console.log(req.body);
     let user = new User({
+      userId: generateUserId(),
         name: req.body.name,
         email: req.body.email,
         passwordHash: bcrypt.hashSync(req.body.password, 10),
@@ -147,40 +151,103 @@ router.put('/:id', async (req, res) => {
     res.send(user);
 });
 
+// router.post('/login', (req, res) => {
+//     User.findOne({ email: req.body.email }, (err, user) => {
+//         if (err) {
+//             console.log(err)
+//             res.json({ msg: "Somthing went wrong" });
+//         }
+//         else {
+//             if (!user) {
+//                 res.json({ msg: 'Invalid Email!!' })
+//             }
+//             else {
+//                 bcrypt.compare(req.body.password, user.passwordHash).then(match => {
+//                     if (match) {
+//                         console.log("login sucesssss");
+//                         let payload = { subject: user._id, email: user.email }
+//                         console.log("pay",payload)
+//                         let token = jwt.sign(payload, 'secret')
+//                         res.status(200).send({ token: token, role: user.role,email: user.email, name:user.name,contact:user.phone})
+//                     }
+//                     else {
+//                         console.log("incoreect passss");
+//                         res.json({ msg: 'Incorrect password!!' })
+//                     }
+//                 }).catch(err => {
+//                     console.log("somthing wrong");
+//                     res.json({ msg: 'Somthing went wrong' })
+//                 })
+//             }
+//         }
+//     })
 
-router.post('/login', (req, res) => {
+// })
+
+  router.post('/login', (req, res) => {
     User.findOne({ email: req.body.email }, (err, user) => {
-        if (err) {
-            console.log(err)
-            res.json({ msg: "Somthing went wrong" });
-        }
-        else {
-            if (!user) {
-                res.json({ msg: 'Invalid Email!!' })
-            }
-            else {
-                bcrypt.compare(req.body.password, user.passwordHash).then(match => {
-                    if (match) {
-                        console.log("login sucesssss");
-                        let payload = { subject: user._id, email: user.email }
-                        console.log("pay",payload)
-                        let token = jwt.sign(payload, 'secret')
-                        res.status(200).send({ token: token, role: user.role,email: user.email, name:user.name,contact:user.phone})
+      if (err) {
+        console.log(err)
+        res.json({ msg: "Something went wrong" });
+      } else {
+        if (!user) {
+          res.json({ msg: 'Invalid Email!!' })
+        } else {
+          bcrypt.compare(req.body.password, user.passwordHash).then(match => {
+            if (match) {
+              console.log("login success");
+              let payload = { subject: user._id, email: user.email }
+              console.log("pay",payload)
+              let token = jwt.sign(payload, 'secret')
+              // reset loginAttempts to 0 after successful login
+              user.updateOne({ loginAttempts: 0 }, (err) => {
+                if (err) {
+                  console.log(err);
+                }
+              });
+              res.status(200).send({ token: token, role: user.role, email: user.email, name: user.name, contact: user.phone })
+            } else {
+              console.log("incorrect password");
+              const now = new Date();
+              if (user.loginAttempts >= 3 && user.lastFailedLoginAttempt && (now - user.lastFailedLoginAttempt) < 60 * 60 * 1000) {
+                // If the user has reached the maximum number of login attempts within the last hour, return an error message
+                res.json({ msg: 'Too many incorrect attempts. Please try again later.' })
+              } else if (user.loginAttempts >= 3) {
+                // If the user has reached the maximum number of login attempts and the last attempt was more than an hour ago, reset the loginAttempts counter
+                if ((now - user.lastFailedLoginAttempt) >= 60 * 60 * 1000) {
+                  user.loginAttempts = 1;
+                  user.lastFailedLoginAttempt = now;
+                  user.save((err) => {
+                    if (err) {
+                      console.log(err);
                     }
-                    else {
-                        console.log("incoreect passss");
-                        res.json({ msg: 'Incorrect password!!' })
-                    }
-                }).catch(err => {
-                    console.log("somthing wrong");
-                    res.json({ msg: 'Somthing went wrong' })
-                })
+                  });
+                  res.json({ msg: 'Incorrect password!!' })
+                } else {
+                  res.json({ msg: 'Too many incorrect attempts. Please try again later.' })
+                }
+              } else {
+                // Otherwise, increment the loginAttempts counter and set the lastFailedLoginAttempt field to the current time
+                user.loginAttempts += 1;
+                user.lastFailedLoginAttempt = now;
+                user.save((err) => {
+                  if (err) {
+                    console.log(err);
+                  }
+                });
+                res.json({ msg: 'Incorrect password!!' })
+              }
             }
+  
+          }).catch(err => {
+            console.log("something went wrong");
+            res.json({ msg: 'Something went wrong' })
+          })
         }
-    })
-
-})
-
+      }
+    });
+  });
+  
 
 // Define the Google Login route
 router.post('/google-login', async (req, res) => {
@@ -283,9 +350,66 @@ router.post('/facebook-login', async (req, res) => {
   });
   
   
+// router.post('/register', async (req, res) => {
+//     console.log(req.body);
+//     let user = new User({
+//         name: req.body.name,
+//         email: req.body.email,
+//         passwordHash: bcrypt.hashSync(req.body.password, 10),
+//         phone: req.body.phone,
+//         role: req.body.role,
+//         isAdmin: req.body.isAdmin,
+//         isEmployer: req.body.isEmployer,
+//         street: req.body.street,
+//         apartment: req.body.apartment,
+//         zip: req.body.zip,
+//         city: req.body.city,
+//         country: req.body.country,
+//     });
+//     User.find({ email: req.body.email }, (err, users) => {
+//         if (err) {
+//             console.log('err in finding email ');
+//             res.json({ msg: 'some error!' });
+//         }
+//         if (users.length != 0) {
+//             console.log('already user with this email');
+//             res.json({ msg: 'already user exist with this email!' });
+//         }
+
+//         else {
+//             user.save((error, registeredUser) => {
+//                 if (error) {
+//                     console.log(error);
+//                     res.json({ msg: "some error!" });
+//                 }
+//                 else {
+//                     let payload = { subject: registeredUser._id }
+//                     let token = jwt.sign(payload, 'secret')
+//                     res.status(200).json({ token: token })
+//                 }
+//             })
+//         }
+
+//     });
+//     // user = await user.save();
+
+//     // if (!user) return res.status(400).send('the user cannot be created!');
+
+//     // res.send(user);
+// });
+
+// Generate a unique user ID using a combination of ObjectId and crypto module
+function generateUserId() {
+  const id = new ObjectId();
+  const md5sum = crypto.createHash('md5');
+  md5sum.update(id.toString());
+  return md5sum.digest('hex');
+}
+
 router.post('/register', async (req, res) => {
     console.log(req.body);
     let user = new User({
+        //userId: generateUserId(),
         name: req.body.name,
         email: req.body.email,
         passwordHash: bcrypt.hashSync(req.body.password, 10),
@@ -324,14 +448,7 @@ router.post('/register', async (req, res) => {
         }
 
     });
-    // user = await user.save();
-
-    // if (!user) return res.status(400).send('the user cannot be created!');
-
-    // res.send(user);
 });
-
-
 router.put('/:id', upload.single('image'), async (req, res) => {
     try {
       // Find the user by ID
@@ -434,58 +551,56 @@ router.post('/Reset', async (req, res) => {
         }
     });
 });
-
 //reset password done
+router.post('/reset-password-done', async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) {
+      return res.status(404).json({ msg: 'User does not exist with this email!!' });
+    }
 
-router.post('/resestPasswordDone', async (req, res) => {
-    User.findOne({ email: req.body.email }, async (err, user) => {
-        if (err) {
-            console.log(err);
-            res.json({ msg: 'Somthing went wrong' });
-        } else {
-            if (!user) {
-                res.json({ msg: 'User does not exist with this email!!' });
-            } else {
-                Otp.findOne({ email: req.body.email }, async (err, otps) => {
-                    if (err) {
-                        res.json({ msg: 'Somthing went wrong' });
-                    }
-                    if (!otps) {
-                        res.json({ msg: 'Somthing went wrong' });
-                    } else {
-                        var otp = otps.otp;
-                        if (otp != req.body.otp) {
-                            res.json({ msg: 'Invalid Otp!!!' });
-                        } else {
-                            var p = User.hashPassword(req.body.password);
-                            var x = await getEmail(req.body.email);
-                            User.updateOne(
-                                { email: req.body.email },
-                                { passwordHash: p },
-                                function (err, user) {
-                                    console.log(1);
-                                    if (err) {
-                                        console.log(err);
-                                        res.json({ msg: 'Somthing went wrong' });
-                                    } else {
-                                        res.json({ message: 'password updated!!' });
-                                    }
-                                }
-                            );
-                        }
-                    }
-                });
-            }
+    const otps = await Otp.findOne({ email: req.body.email });
+    if (!otps) {
+      return res.status(400).json({ msg: 'Invalid request' });
+    }
+
+    const otp = otps.otp;
+    if (otp != req.body.otp) {
+      return res.status(400).json({ msg: 'Invalid Otp!!!' });
+    }
+
+    const passwordHash = User.hashPassword(req.body.password);
+    const updatedUser = await User.findOneAndUpdate(
+      { email: req.body.email },
+      { passwordHash },
+      { new: true }
+    );
+
+    // send password updated message to user by email
+    const transporter = nodemailer.createTransport({
+      host: "smtp.hostinger.com",
+        port: 465,
+        secure: true, // true for 465, false for other ports
+        auth: {
+            user: 'info@jobluu.com',
+            pass: process.env.EMAILPASSWORD
         }
     });
+
+    await transporter.sendMail({
+      from: 'info@jobluu.com',
+      to: user.email,
+      subject: 'Password Updated Successfully',
+      html: `<p>Dear ${user.name},</p>
+              <p>Your password has been updated successfully.</p>`,
+    });
+
+    return res.json({ message: 'password updated!!' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ msg: 'Something went wrong' });
+  }
 });
-
-
-
-
-
-
-
 
 router.delete('/:id', (req, res) => {
     User.findByIdAndRemove(req.params.id)

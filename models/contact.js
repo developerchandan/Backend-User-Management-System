@@ -3,16 +3,26 @@ const mongoose = require('mongoose');
 const contactSchema = mongoose.Schema({
     name: {
         type: String,
-        required: true,
+        
     },
     email: {
         type: String,
     },
-    mobile: { 
+    contact: { 
         type: String,
     },
     message: { 
         type: String,
+    },
+    company: { 
+        type: String,
+    },
+    isPrivacyPolicy: {
+        type: Boolean,
+        default: false,
+    },
+    newsletter:{
+        type: String, 
     }
 
 })
