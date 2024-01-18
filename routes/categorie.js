@@ -1,11 +1,11 @@
-const { QuizCategory } = require('../models/quiz-category');
+const { Category, Subcategory } = require('../models/category');
 const express = require('express');
 const router = express.Router();
 
 // Get all categories
 router.get('/api/categories', async (req, res) => {
   try {
-    const categories = await QuizCategory.find();
+    const categories = await Category.find().populate('subcategories');
     res.json(categories);
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
@@ -18,46 +18,61 @@ router.post('/api/categories', async (req, res) => {
 
   try {
     const { name, description } = req.body;
-    const newCategory = new QuizCategory({ name, description, uniqueCategoryName });
+    const newCategory = new Category({ name, description, uniqueCategoryName });
     const savedCategory = await newCategory.save();
     res.status(201).json(savedCategory);
   } catch (error) {
     res.status(400).json({ error: 'Bad request' });
   }
+})
+
+// Get all subcategories
+router.get('/api/subcategories', async (req, res) => {
+  try {
+    const subcategories = await Subcategory.find();
+    res.json(subcategories);
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-// Create a new subcategory within a category
 router.post('/api/categories/:categoryId/subcategories', async (req, res) => {
+  console.log(req.body)
   const uniqueSubCategoryName = req.body.name.replace(/\s+/g, '-');
-  
   try {
     const { categoryId } = req.params;
-    const category = await QuizCategory.findById(categoryId);
+    const category = await Category.findById(categoryId);
 
     if (!category) {
       return res.status(404).json({ error: 'Category not found' });
     }
 
-    category.subcategories.push({
+    const subcategory = new Subcategory({
       name: req.body.name,
       description: req.body.description,
       uniqueSubCategoryName,
     });
 
-    const savedCategory = await category.save();
-    res.status(201).json(savedCategory.subcategories[savedCategory.subcategories.length - 1]);
+    const savedSubcategory = await subcategory.save();
+
+    // Add the subcategory's ObjectId to the category's subcategories array
+    category.subcategories.push(savedSubcategory._id);
+    await category.save();
+
+    res.status(201).json(savedSubcategory);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
+
 // DELETE a category by its ID
 router.delete('/api/categories/:categoryId', async (req, res) => {
   try {
-    const { categoryId } = req.params;
+    const categoryId = req.params.categoryId;
 
     // Find the category by its ID and remove it from the database
-    const deletedCategory = await QuizCategory.findByIdAndDelete(categoryId);
+    const deletedCategory = await Category.findByIdAndDelete(categoryId);
 
     if (!deletedCategory) {
       return res.status(404).json({ success: false, message: 'Category not found!' });
@@ -70,18 +85,12 @@ router.delete('/api/categories/:categoryId', async (req, res) => {
 });
 
 // DELETE a subcategory by its ID
-router.delete('/api/categories/:categoryId/subcategories/:subcategoryId', async (req, res) => {
+router.delete('/api/subcategories/:subcategoryId', async (req, res) => {
   try {
-    const { categoryId, subcategoryId } = req.params;
-    const category = await QuizCategory.findById(categoryId);
+    const subcategoryId = req.params.subcategoryId;
 
-    if (!category) {
-      return res.status(404).json({ success: false, message: 'Category not found!' });
-    }
-
-    // Find the subcategory by its ID and remove it from the category's subcategories array
-    const deletedSubcategory = category.subcategories.id(subcategoryId).remove();
-    await category.save();
+    // Find the subcategory by its ID and remove it from the database
+    const deletedSubcategory = await Subcategory.findByIdAndDelete(subcategoryId);
 
     if (!deletedSubcategory) {
       return res.status(404).json({ success: false, message: 'Subcategory not found!' });

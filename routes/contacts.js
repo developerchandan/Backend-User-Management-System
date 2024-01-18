@@ -3,49 +3,45 @@ const { Newsletter } = require('../models/newsletter');
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const { Configuration, OpenAIApi } = require('openai');
 
+const {OpenAIApi, Configuration} = require('openai');
+const configuration = new Configuration({
+  apiKey: process.env.API_KEY,
+});
 
-const openaiConfig = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-  
-  const openai = new OpenAIApi(openaiConfig);
-  
-//   router.post('/api/chatgpt', async (req, res) => {
-//     console.log(req.body);
-//     const prompt = req.body.prompt;
-//     const model = req.body.model;
-//     const maxTokens = req.body.maxTokens;
-//     const temperature=req.body.temperature;
-//     const top_p=req.body.top_p;
-//     const frequency_penalty=req.body.frequency_penalty;
-//     const presence_penalty=req.body.presence_penalty;
-  
-//     const response = await openai.createCompletion({
-//       model: model,
-//       prompt: prompt,
-//       max_tokens: maxTokens,
-//       temperature:temperature,
-//       top_p:top_p,
-//       frequency_penalty:frequency_penalty,
-//       presence_penalty:presence_penalty,
-//     })
-  
-//     // res.send(response);
-//     .then((response) => {
-//         console.log(response);
-//             res.status(200).send(response.data.choices[0].text);
-//           }).catch((error) => {
-//             res.status(500).send(error);
-//           });
-//   });
+// Rest of your code
+router.post('/generate-text', async (req, res) => {
+  try {
+    const { model, prompt, max_tokens } = req.body;
+    console.log(req.body);
+
+    const openai = new OpenAIApi(configuration);
+    console.log(process.env.OPENAI_API_KEY);
+
+    const response = await openai.createCompletion({
+      model: model,
+      prompt: prompt,
+      max_tokens: max_tokens,
+      temperature: 0.5,
+    });
+
+    console.log("OpenAI API Response:", response.data);
+    
+    const generatedText = response.data.choices[0].text;
+    console.log("Generated Text:", generatedText);
+
+    res.status(200).json({ text: generatedText });
+  } catch (error) {
+    console.error('OpenAI API Error:', error.response.data.error);
+    res.status(400).json({ error: error.response.data.error.message });
+  }
+});
 
 router.post('/api/chatgpt', async (req, res) => {
     console.log(req.body);
     const prompt = req.body.prompt;
     const model = req.body.model;
-    const maxTokens = req.body.maxTokens || 1024; // Increase the default to 1024
+    const maxTokens = req.body.maxTokens || 1024; 
     const temperature=req.body.temperature;
     const top_p=req.body.top_p;
     const frequency_penalty=req.body.frequency_penalty;

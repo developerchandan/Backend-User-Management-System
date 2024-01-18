@@ -9,7 +9,6 @@ const { Question } = require('../models/question');
 const { User } = require('../models/user');
 const bodyParser = require("body-parser");
 const jsonParser = bodyParser.json();
-
 const axios = require('axios');
 const { Configuration, OpenAIApi } = require('openai');
 
@@ -57,67 +56,116 @@ const storage = multer.diskStorage({
 
 const uploadOptions = multer({ storage: storage });
 
-// 
-
 router.get(`/quiz/all`, async (req, res) => {
-    console.log(req.body);
-    // let filter = {};
-    // if (req.query.categories) {
-    //     filter = { category: req.query.categories.split(',') };
-    // }
-    // if (req.query.subCategories) {
-    //     filter = { ...filter, subCate: req.query.subCategories.split(',') };
-    // }
+  const page = req.query.page ? parseInt(req.query.page) : 1;
+  const limit = 20;
+  const filters = {};
 
-    const strengthList = await HumanR.find().sort({ name: 1 }).populate('category');
+  // Check if subCategory filter is provided
+  if (req.query.subCategory) {
+      filters.subCategory = { $in: req.query.subCategory.split(',') };
+  }
 
-    if (!strengthList) {
-        res.status(500).json({ success: false });
-    }
-    res.send(strengthList);
+  // Check if categories filter is provided
+  if (req.query.categories) {
+      filters.category = { $in: req.query.categories.split(',') };
+  }
+
+  try {
+      const count = await HumanR.countDocuments(filters);
+      const totalPages = Math.ceil(count / limit);
+
+      const strengthList = await HumanR.find(filters)
+          .sort({ name: 1 })
+
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .exec();
+
+      res.json({
+          currentPage: page,
+          totalPages: totalPages,
+          totalItems: count,
+          strengthList: strengthList
+      });
+  } catch (error) {
+      console.error('Error querying strengthList:', error);
+      res.status(500).send('Internal Server Error');
+  }
 });
 
-// router.get(`/quiz/all`, async (req, res) => {
-//     let filter = {};
-//     if (req.query.categories) {
-//         filter = {
-//             category: { $in: req.query.categories.split(',') },
-//             'category.subCategory': { $in: req.query.subCategories.split(',') }
-//         };
-//     }
+router.get('/gettest', async (req, res) => {
+  const { categories, subCategory, page } = req.query;
+  const categoryArray = categories ? categories.split(',') : [];
+  const subCategoryArray = subCategory ? subCategory.split(',') : [];
+  const currentPage = parseInt(page) || 1;
+  const coursesPerPage = 20;
+  const skip = (currentPage - 1) * coursesPerPage;
 
-//     const strengthList = await HumanR.find(filter).sort({ name: 1 }).populate('category').populate('subCategory');
+  try {
+    let query = {};
 
-//     if (!strengthList) {
-//         res.status(500).json({ success: false });
-//     }
-//     res.send(strengthList);
-// });
+    // Check if either categories or subcategories are provided
+    if (categoryArray.length > 0 || subCategoryArray.length > 0) {
+      query = {
+        // If categories and subCategory are strings in the database
+        $or: [
+          { category: { $in: categoryArray } },
+          { subCategory: { $in: subCategoryArray } },
+        ],
+      };
+    }
 
+    const courses = await HumanR.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(coursesPerPage)
+      .exec();
 
+    res.json(courses);
+  } catch (error) {
+    console.error('Error querying courses:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
 
+router.get('/test/:id', async (req, res) => {
+  try {
+    const testId = req.params.id;
+
+    // Fetch the requested test
+    const requestedTest = await HumanR.findById(testId);
+
+    if (!requestedTest) {
+      return res.status(404).json({ message: 'Test not found' });
+    }
+
+    // Extract category from the fetched test
+    const category = requestedTest.category;
+
+    // Fetch tests with the same category as the requested test
+    const recommendedTests = await HumanR.find({
+      category: { $in: category }, // Use $in to match multiple categories
+      _id: { $ne: testId }
+    }).limit(5);
+
+    res.json({
+      requestedTest: requestedTest,
+      recommendations: recommendedTests
+    });
+  } catch (err) {
+    console.error('Error fetching test:', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
 
 router.get('/:id', async (req, res) => {
-    const human = await HumanR.findById(req.params.id)
-        .populate('category');
-
+    const human = await HumanR.findById(req.params.id);
     if (!human) {
         res.status(500).json({ message: 'The human with the given ID was not found.' })
     }
     res.status(200).send(human);
 })
-
-
-
-// router.get('/quiz/all', async (req, res) => {
-//     const human = await HumanR.find({}).sort({ name: 1 }).populate('category');
-
-//     if (!human) {
-//         res.status(500).json({ message: 'The human with the given ID was not found.' })
-//     }
-//     res.status(200).send(human);
-// })
-
 
 router.post('/addstrengthvalue', upload.single('file'), async (req, res) => {
 
@@ -167,13 +215,6 @@ router.get(`/get/type/:type`, async (req, res) => {
 //@ Add items..
 
 router.post('/addstrengthvalues', upload.single('image'), async (req, res) => {
-    console.log("category",req.body);
-
-     //let catID = req.body.category.split(',');
-    // let subCatID = req.body.subCategory.split(',');
-
-    // console.log(subCatID.length);
-    
 
     let params = {
         Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
@@ -199,13 +240,14 @@ router.post('/addstrengthvalues', upload.single('image'), async (req, res) => {
         type:req.body.type,
         description: req.body.description,
         email: req.body.email,
-        // category: req.body.category,
-        // subCategory: req.body.subCategory,
+        category: req.body.category.split(','),
+        subCategory: req.body.subCategory.split(','),
         richdescription: req.body.richdescription,
         isFeatured: req.body.isFeatured,
         isHomeFeatured:req.body.isHomeFeatured,
         owner: whoid,
-        owneremail: whoemail
+        owneremail: whoemail,
+        summary: req.body.summary 
     })
     humanResource = await humanResource.save();
 
@@ -222,10 +264,6 @@ router.post('/addstrengthvalues', upload.single('image'), async (req, res) => {
             });
         }
         else {
-
-            // console.log("response", result)
-            // console.log("response", result.Location)           
-            // console.log(humanResource);
             HumanR.findByIdAndUpdate({ _id: humanResource._id }, {
                 $set: {
                     image: result.Location
@@ -245,41 +283,14 @@ router.post('/addstrengthvalues', upload.single('image'), async (req, res) => {
 })
 
 router.post('/getlistdata', async (req, res) => {
-    // console.log("Hi", req.params.key);
-    console.log(req.body)
-    // console.log(req.body.role)
-    HumanR.find({ email: req.body.email }).populate('category').then((result) => {
+    HumanR.find({ email: req.body.email })
+    .then((result) => {
         res.send({ data: result, status: 'success' })
     }).catch((e) => {
         res.send(e);
     })
 });
 
-
-
-
-// router.put('/:id', upload.single('image'), async (req, res) => {
-//     // console.log(req.body)
-//     // let catID = req.body.category.split(',');
-//     const updatedProduct = await HumanR.findByIdAndUpdate(
-//         req.params.id,
-//         {
-//             name: req.body.name,
-//             type:req.body.type,
-//             description: req.body.description,
-//             email: req.body.email,
-//             // category: catID,
-//             isFeatured: req.body.isFeatured,
-//             isHomeFeatured:req.body.isHomeFeatured,
-//             richdescription: req.body.richdescription,
-//         },
-//         { new: true }
-//     );
-
-//     if (!updatedProduct) return res.status(500).send('the Strength cannot be updated!');
-
-//     res.send(updatedProduct);
-// });
 router.put('/:id', upload.single('image'), async (req, res) => {
   let updatedProduct = {};
 
@@ -310,11 +321,13 @@ router.put('/:id', upload.single('image'), async (req, res) => {
   updatedProduct.name = req.body.name;
   updatedProduct.type = req.body.type;
   updatedProduct.description = req.body.description;
+  updatedProduct.category = req.body.category.split(',');
+  updatedProduct.subCategory = req.body.subCategory.split(',');
   updatedProduct.email = req.body.email;
   updatedProduct.isFeatured = req.body.isFeatured;
   updatedProduct.isHomeFeatured = req.body.isHomeFeatured;
   updatedProduct.richdescription = req.body.richdescription;
-
+  updatedProduct.summary = req.body.summary
   try {
     const product = await HumanR.findByIdAndUpdate(req.params.id, updatedProduct, { new: true });
     res.send(product);
@@ -323,21 +336,6 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     res.status(500).send('Error updating product');
   }
 });
-
-
-//@ Delete items..
-
-// router.delete('/:id', (req, res) => {
-//     HumanR.findByIdAndRemove(req.params.id).then(category => {
-//         if (category) {
-//             return res.status(200).json({ success: true, message: 'the HumanR is deleted!' })
-//         } else {
-//             return res.status(404).json({ success: false, message: "HumanR not found!" })
-//         }
-//     }).catch(err => {
-//         return res.status(500).json({ success: false, error: err })
-//     })
-// })
 
 router.delete('/:id', async (req, res) => {
     try {
@@ -478,6 +476,54 @@ router.put('/subcompetency/:id', jsonParser, (req, res) => {
 
 })
 
+router.put('/subcompetency/analysis/:id', jsonParser, (req, res) => {
+  console.log(req.body);
+  const subcompetencyIdToUpdate = req.params.id;
+  const subCompatencyAnalysis = {
+      analysis_name: req.body.analysis_name,
+      analysis_range: req.body.analysis_range
+  };
+
+  HumanR.findOneAndUpdate(
+      { 'subCompetency._id': subcompetencyIdToUpdate },
+      {
+          $push: {
+              'subCompetency.$.subCompatencyAnalysis': subCompatencyAnalysis
+          }
+      },
+      { new: true }
+  )
+      .then((Result) => {
+          res.send(Result);
+      })
+      .catch((error) => {
+          res.send(error);
+      });
+});
+router.delete('/subcompetency/analysis/:id', (req, res) => {
+    const subcompetencyAnalysisIdToDelete = req.params.id;
+  
+    HumanR.findOneAndUpdate(
+      { 'subCompetency.subCompatencyAnalysis._id': subcompetencyAnalysisIdToDelete },
+      {
+        $pull: {
+          'subCompetency.$.subCompatencyAnalysis': { _id: subcompetencyAnalysisIdToDelete }
+        }
+      },
+      { new: true }
+    )
+      .then((result) => {
+        if (!result) {
+          return res.status(404).send("Subcompetency analysis not found");
+        }
+        res.send(result);
+      })
+      .catch((error) => {
+        res.status(500).send(error);
+      });
+  });
+  
+
 //Delete Subcompetency Item !
 router.delete('/deletesubcompetencyitem/:subCompetencyId', (req, res) => {
     HumanR.findOneAndUpdate(
@@ -493,29 +539,6 @@ router.delete('/deletesubcompetencyitem/:subCompetencyId', (req, res) => {
     });
 });
 
-
-// add property SubBehaviour Items !
-// router.put('/behaviour/:id', jsonParser, (req, res) => {
-//     console.log(req.body);
-//     HumanR.findOneAndUpdate({"subCompetency._id": req.params.id }, {
-//         $push: {
-
-//             "subCompetency.$.subBeahviourList": {
-//                 beahviourName: req.body.beahviourName,
-              
-//             }
-
-//         }
-//     },
-//         {new: true}
-//     ).then((Result) => {
-//         res.send(Result);
-//     })
-//         .catch((error) => {
-//             res.send(error);
-//         })
-
-// });
 // add property subBehaviour Items !
 
 router.put('/behaviour/:id', jsonParser, (req, res) => {
@@ -643,40 +666,26 @@ router.put('/summary_add/:id', jsonParser, (req, res) => {
       res.send(error);
     })
   });
+
+  router.delete('/summary/:summaryId', (req, res) => {
+    const summaryId = req.params.summaryId;
   
-// router.put('/question_add/:id', jsonParser, (req, res) => {
-//     console.log(req.body);
-//     console.log(req.body.testID);
-//     HumanR.findOneAndUpdate({"subCompetency._id": req.params.id, "subCompetency.subBeahviourList._id": req.body.subBehaviourId }, {
-//         $push: {
-
-//             "subCompetency.$.subBeahviourList.$[i].Question": {
-//                 "questionId": q.length + 1,
-//                 "propertyid": req.body.subBehaviourId,
-//                 "competencyId":req.body.testID,
-//                 "subcompetencyid":req.params.id,
-//                 "questionText":req.body.questionText,
-//                 "answer":req.body.answer,
-//                 "options":req.body.options, 
-//             }
-//         }
-//     },
-//     {
-//         arrayFilters: [
-//             {
-//                 "i._id": req.body.subBehaviourId
-//             }
-//         ]
-//     },
-        
-//     ).then((Result) => {
-//         res.send(Result);
-//     })
-//         .catch((error) => {
-//             res.send(error);
-//         })
-
-// });
+    HumanR.updateOne(
+      { 'summary._id': summaryId },
+      { $pull: { summary: { _id: summaryId } } }
+    )
+      .then((result) => {
+        if (result.nModified > 0) {
+          res.status(204).send(); 
+        } else {
+          res.status(404).send('Summary not found');
+        }
+      })
+      .catch((error) => {
+        res.status(500).send(error);
+      });
+  });
+  
 router.get('/questions/:subcompetencyid', (req, res) => {
     let subcompetencyid = req.params.subcompetencyid;
   
@@ -881,28 +890,6 @@ router.put('/removequestion/:questionId', async (req, res) => {
     }
 });
 
-
-        // Pull the question with the given questionId from the list of questions
-
-
-// router.delete('/delete/:_id', (req, res) => {
-//     const id = mongoose.Types.ObjectId(req.params._id);
-//     HumanR.findOneAndRemove({ "subCompetency.subBeahviourList.Question._id": id }).then(category => {
-//         if (category) {
-//             return res.status(200).json({ success: true, message: 'the HumanR is deleted!' })
-//         } else {
-//             return res.status(404).json({ success: false, message: "HumanR not found!" })
-//         }
-//     }).catch(err => {
-//         return res.status(500).json({ success: false, error: err })
-//     })
-// })
-
-
-//Psychometric Upload True Get API !
-
-
-
 router.get(`/get/count`, async (req, res) => {
     const strengthCount = await HumanR.countDocuments((count) => count);
 
@@ -963,7 +950,7 @@ router.post('/api/analysis-result', async (req, res) => {
     console.log(req.body);
     const prompt = req.body.prompt;
     const model = "text-davinci-003";
-    const maxTokens = 256 || 1024; // Increase the default to 1024
+    const maxTokens = 256 || 1024; 
     const temperature=0.7;
     const top_p=1;
     const frequency_penalty=0;
@@ -987,28 +974,5 @@ router.post('/api/analysis-result', async (req, res) => {
     res.status(500).send(error);
   }
   });
-exports.verifyToken = (req, res, next) => {
-    if (!req.headers.authorization) {
-        return res.status(401).send("unauthorized req")
-    }
-    let token = req.headers.authorization.split(' ')[1]
-    // console.log(token);  
-    if (token == 'null') {
-        return res.status(401).send("unauthorized req")
-    }
-    let payload = jwt.verify(token, 'secret')
-    if (!payload) {
-        return res.status(401).send("unauthorized req")
-    }
-    // console.log("in middleware");
-    // console.log(payload.subject);
-    // console.log(payload.email);
-    req.userId = payload.subject
-    req.email = payload.email;
-    // console.log(req.userId);
-    // console.log(req.email);
-    next()
-}
-
 
 module.exports = router;

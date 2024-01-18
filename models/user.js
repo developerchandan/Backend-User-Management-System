@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 var bcrypt = require('bcrypt');
-const { boolean } = require('joi');
+const { boolean, string } = require('joi');
 const userSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -21,6 +21,14 @@ const userSchema = new mongoose.Schema({
     phone: {
         type: String,
 
+    },
+    userHeadline:{
+        type: String,
+        default: ''
+    },
+    profileImage:{
+        type:String,
+        default:''
     },
     isAdmin: {
         type: Boolean,
@@ -49,10 +57,20 @@ const userSchema = new mongoose.Schema({
     userId:{
         type: String,
     },
-    createdAt: {
-        type: Date,
-        default: Date.now // Set default value to current date and time
-    },
+    assessments: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'PsychometricResult',
+        }
+    ],
+    savePsychometricTestId: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'HumanR',
+        }
+    ],
+
+    otp: String,
     loginAttempts: { type: Number, default: 0 },
     lastFailedLoginAttempt: { type: Date, default: null },
 }, { timestamp: true });

@@ -18,6 +18,9 @@ const gallerySchema = mongoose.Schema({
         type: String,
         default: ''
     },
+    youtubeLink:{
+        type: String,  
+    },
     images: [{
         type: String
     }],

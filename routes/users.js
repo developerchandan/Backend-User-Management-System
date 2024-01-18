@@ -13,7 +13,8 @@ var sendMail = require('../mail/mail');
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client('378973160613-88i6br7bfkfa4tpuvus266rhnlen99gq.apps.googleusercontent.com');
-
+const otp = require('otp');
+const randomstring = require('randomstring');
 const { ObjectId } = require('mongodb');
 // Import the necessary modules
 const axios = require('axios');
@@ -205,7 +206,13 @@ router.put('/:id', async (req, res) => {
                   console.log(err);
                 }
               });
-              res.status(200).send({ token: token, role: user.role, email: user.email, name: user.name, contact: user.phone })
+              res.status(200).send(
+                { token: token, 
+                  role: user.role, 
+                  email: user.email, 
+                  name: user.name,
+                  contact: user.phone,
+                  userId: user._id })
             } else {
               console.log("incorrect password");
               const now = new Date();
@@ -497,109 +504,77 @@ router.put('/:id', upload.single('image'), async (req, res) => {
   });
   
 
-
-///Get Email
-
-function getEmail(email) {
-    Otp.find({ email: email }, (err, otps) => {
-
-        if (err) {
-            console.log("err in finding email ");
-        }
-        if (otps.length != 0) {
-            console.log("yes in delete");
-            Otp.deleteOne({ email: email }, (err) => {
-                if (err)
-                    console.log("err in delete");
-            }
-            )
-        }
-    })
-}
-
-//reset password
-
-router.post('/Reset', async (req, res) => {
-    User.find({ email: req.body.email }, async (err, users) => {
-        if (err) {
-            console.log('err in finding email ');
-            res.json({ msg: 'some error!' });
-        }
-        if (users.length == 0) {
-            console.log('user does not exist with this email at forgot password');
-            res.json({ msg: 'user does not exist with this email' });
-        } else {
-            var email = req.body.email;
-            var x = await getEmail(req.body.email);
-            setTimeout(async function () {
-                console.log('timeout (2min)');
-                var y = await getEmail(email);
-            }, 2 * 60000);
-            var a = Math.floor(1000 + Math.random() * 9000);
-            var otp = new Otp({
-                otp: a,
-                email: req.body.email
-            });
-            console.log('otp =', otp);
-            try {
-                doc = otp.save();
-                sendMail(otp.email, otp.otp);
-                res.status(201).json({ message: 'all ok otp has been send' });
-            } catch (err) {
-                res.json({ msg: 'some error!' });
-            }
-        }
-    });
-});
-//reset password done
-router.post('/reset-password-done', async (req, res) => {
-  try {
-    const user = await User.findOne({ email: req.body.email });
-    if (!user) {
-      return res.status(404).json({ msg: 'User does not exist with this email!!' });
-    }
-
-    const otps = await Otp.findOne({ email: req.body.email });
-    if (!otps) {
-      return res.status(400).json({ msg: 'Invalid request' });
-    }
-
-    const otp = otps.otp;
-    if (otp != req.body.otp) {
-      return res.status(400).json({ msg: 'Invalid Otp!!!' });
-    }
-
-    const passwordHash = User.hashPassword(req.body.password);
-    const updatedUser = await User.findOneAndUpdate(
-      { email: req.body.email },
-      { passwordHash },
-      { new: true }
-    );
-
-    // send password updated message to user by email
-    const transporter = nodemailer.createTransport({
-      host: "smtp.hostinger.com",
-        port: 465,
-        secure: true, // true for 465, false for other ports
-        auth: {
-            user: 'info@jobluu.com',
-            pass: process.env.EMAILPASSWORD
-        }
-    });
-
-    await transporter.sendMail({
-      from: 'info@jobluu.com',
-      to: user.email,
-      subject: 'Password Updated Successfully',
-      html: `<p>Dear ${user.name},</p>
-              <p>Your password has been updated successfully.</p>`,
-    });
-
-    return res.json({ message: 'password updated!!' });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ msg: 'Something went wrong' });
+const transporter = nodemailer.createTransport({
+  host: "smtp.hostinger.com",
+  port: 465,
+  secure: true, // true for 465, false for other ports
+  auth: {
+      user: 'info@jobluu.com',
+      pass: process.env.EMAILPASSWORD
   }
+});
+
+router.post('/forget-password', async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+
+  if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+  }
+
+  // Generate a 6-digit OTP
+  const otpCode = randomstring.generate({
+      length: 6,
+      charset: 'numeric',
+  });
+
+  // Store the OTP in the user document (you need to add an 'otp' field in your schema)
+  user.otp = otpCode;
+  await user.save();
+
+  // Send the OTP to the user via email
+  const mailOptions = {
+      from: 'info@jobluu.com',
+      to: email,
+      subject: 'Forget Password OTP',
+      text: `Your OTP is: ${otpCode}`,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+          console.log(error);
+          return res.status(500).json({ message: 'Failed to send OTP' });
+      }
+      console.log('Email sent: ' + info.response);
+      res.status(200).json({ message: 'OTP sent successfully' });
+  });
+});
+
+
+
+router.post('/reset-password', async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  // console.log('Searching for user with email: ' + email);
+  const user = await User.findOne({ email });
+  
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  if (user.otp !== otp) {
+    return res.status(400).json({ message: 'Invalid OTP' });
+  }
+
+  // Hash the new password securely
+  const saltRounds = 10;
+  const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+  // Reset the password and clear the OTP
+  user.passwordHash = hashedPassword;
+  user.otp = null;
+  await user.save();
+
+  res.status(200).json({ message: 'Password reset successful' });
 });
 
 router.delete('/:id', (req, res) => {
@@ -627,53 +602,100 @@ router.get(`/get/count`, async (req, res) => {
     });
 });
 
+// USER VERIFY TOKEN !
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ msg: 'Unauthorized' });
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, 'secret');
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.log(error);
+    res.status(401).json({ msg: 'Invalid token' });
+  }
+};
 
-//verify token
-
-router.post('/verifyToken', async (req, res) => {
-    if (!req.headers.authorization) {
-        return res.status(401).send("unauthorized req")
+// USER PROFILE SECTION START HERE !
+router.get('/profile/:userId', verifyToken,async (req, res) => {
+  try {
+    const user = await User.findById({_id:req.params.userId});
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found' });
     }
-    let token = req.headers.authorization.split(' ')[1]
-    // console.log(token);
-    if (token == 'null') {
-        return res.status(401).send("unauthorized req")
-    }
-    let payload = jwt.verify(token, 'secret')
-    if (!payload) {
-        return res.status(401).send("unauthorized req")
-    }
-    // console.log("in middleware");
-    // console.log(payload.subject);
-    // console.log(payload.email);
-    req.userId = payload.subject
-    req.email = payload.email;
-    // console.log(req.userId);
-    // console.log(req.email);
-    next()
-})
+    res.status(200).json(user);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ msg: 'Something went wrong' });
+  }
+});
 
-// exports.verifyToken = (req, res, next) => {
-//     if (!req.headers.authorization) {
-//         return res.status(401).send("unauthorized req")
-//     }
-//     let token = req.headers.authorization.split(' ')[1]
-//     // console.log(token);
-//     if (token == 'null') {
-//         return res.status(401).send("unauthorized req")
-//     }
-//     let payload = jwt.verify(token, 'secret')
-//     if (!payload) {
-//         return res.status(401).send("unauthorized req")
-//     }
-//     // console.log("in middleware");
-//     // console.log(payload.subject);
-//     // console.log(payload.email);
-//     req.userId = payload.subject
-//     req.email = payload.email;
-//     // console.log(req.userId);
-//     // console.log(req.email);
-//     next()
-// }
+// Update user profile and upload image to S3
+router.put('/update-profile/:userId', verifyToken, upload.single('profileImage'), async (req, res) => {
+ // console.log(req.profileImage)
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
 
+    // Update user profile information
+    user.name = req.body.name || user.name;
+    user.email = req.body.email || user.email;
+    user.phone = req.body.phone || user.phone;
+    user.userHeadline = req.body.userHeadline || user.userHeadline;
+    user.country=req.body.country ||user.country;
+    user.updatedAt = new Date();
+    
+    // Upload user image to S3
+    if (req.file) {
+      const params = {
+        Bucket: 'sudakshtas',
+        Key: `${user._id}/profile-image.jpg`,
+        Body: req.file.buffer,
+        //ACL: 'public-read'
+      };
+
+      s3.upload(params, function(err, data) {
+        if (err) {
+          console.log(err);
+          return res.status(500).json({ msg: 'Failed to upload image' });
+        }
+        user.profileImage = data.Location;
+        user.save();
+        res.status(200).json(user);
+      });
+    } else {
+      await user.save();
+      res.status(200).json(user);
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ msg: 'Something went wrong' });
+  }
+});
+
+router.post('/users/:userId/assessments', async (req, res) => {
+  const { userId } = req.params;
+  const { psychometricResultId } = req.body;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Add the applied job to the user's profile
+    user.assessments.push(psychometricResultId);
+    await user.save();
+
+    res.json({ message: 'assessments added to user profile' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 module.exports = router;

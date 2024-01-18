@@ -67,69 +67,135 @@ router.get('/:id', async (req, res) => {
     res.status(200).send(blog);
 })
 
+router.get('/d/:uniquename', async (req, res) => {
+  console.log(req.params.uniquename);
+  const blog = await Blog.findOne({ uniquename: req.params.uniquename });
+    
+  if (!blog) {
+      return res.status(404).json({ message: 'The blog with the given ID was not found.' });
+  }
+  
+  res.status(200).send(blog);
+});
+
 //@ Add items..
 
 router.post('/addblog', upload.single('image'), async (req, res) => {
-    console.log("Blog",req.body);
-    let params = {
-        Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
-        Key: req.file.originalname,
-        Body: req.file.buffer,
-    };
+  console.log("Blog", req.body);
+  let params = {
+      Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
+      Key: req.file.originalname,
+      Body: req.file.buffer,
+  };
 
-    const file = req.file;
-    if (!file) return res.status(400).send('No image in the request');
+  const file = req.file;
+  if (!file) return res.status(400).send('No image in the request');
 
-    const fileName = file.filename;
-    console.log(fileName);
+  const fileName = file.filename;
+  console.log(fileName);
+
+  // Generate unique blog title with hyphens instead of spaces
+  const uniqueBlogTitle = req.body.name.replace(/\s+/g, '-');
+
+  let blogResource = new Blog({
+      name: req.body.name,
+      uniquename: uniqueBlogTitle,
+      description: req.body.description,
+      richdescription: req.body.richdescription,
+  });
+
+  blogResource = await blogResource.save();
+
+  if (!blogResource)
+      return res.status(400).send('The blogResource cannot be created!');
+
+  s3.upload(params, (err, result) => {
+      if (err) {
+          console.log('Upload failed');
+          res.status(500).json({
+              message: 'Failed to upload file',
+              error: err.message,
+          });
+      } else {
+          Blog.findByIdAndUpdate({ _id: blogResource._id }, {
+              $set: {
+                  image: result.Location
+              }
+          }).then((data) => {
+              console.log(data);
+              res.json({ data });
+          }).catch((e) => {
+              res.send(e);
+          });
+      }
+  });
+});
 
 
+
+// Add Multiple file in S3 server !
+router.post('/add-multiple-image-blog', upload.array('images'), async (req, res) => {
+    console.log("Blog", req.body);
+    
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).send('No files in the request');
+    }
+  
+    const fileNames = files.map(file => file.filename);
+    console.log(fileNames);
+  
     let blogResource = new Blog({
-
-        name: req.body.name,
-        description: req.body.description,
-        richdescription: req.body.richdescription,
-        
-    })
+      name: req.body.name,
+      description: req.body.description,
+      richdescription: req.body.richdescription,
+    });
+  
     blogResource = await blogResource.save();
-
-    if (!blogResource)
-        return res.status(400).send('the blogResource cannot be created!')
-
-    s3.upload(params, (err, result) => {
-
-        if (err) {
-            console.log('upload failed')
-            res.status(500).json({
-                message: "Failed to upload file",
-                error: err.message,
-            });
-        }
-        else {
-
-            // console.log("response", result)
-            // console.log("response", result.Location)           
-            // console.log(humanResource);
+  
+    if (!blogResource) {
+      return res.status(400).send('The blogResource cannot be created!');
+    }
+  
+    const uploadPromises = files.map(file => {
+      const params = {
+        Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
+        Key: file.originalname,
+        Body: file.buffer,
+      };
+  
+      return new Promise((resolve, reject) => {
+        s3.upload(params, (err, result) => {
+          if (err) {
+            console.log('Upload failed:', err);
+            reject(err);
+          } else {
             Blog.findByIdAndUpdate({ _id: blogResource._id }, {
-                $set: {
-                    image: result.Location
-                }
+              $push: {
+                images: result.Location
+              }
             }).then((data) => {
-
-                console.log(data);
-                res.json({ data });
-
+              console.log(data);
+              resolve();
             }).catch((e) => {
-                res.send(e)
-            })
-        }
-
-    })
-
-})
-
-
-
+              reject(e);
+            });
+          }
+        });
+      });
+    });
+  
+    try {
+      await Promise.all(uploadPromises);
+      res.json({ data: blogResource });
+    } catch (error) {
+      res.status(500).json({
+        message: "Failed to upload file",
+        error: error.message,
+      });
+    }
+  });
+  
 
 
 

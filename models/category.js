@@ -1,46 +1,39 @@
+
 const mongoose = require('mongoose');
 
-const categorySchema = mongoose.Schema({
-    name: {
-        type: String,
-
-    },
-    icon: {
-        type: String,
-    },
-    color: {
-        type: String,
-    }
-    , subCategory: [
-        {
-            subCategoryName: String,
-            subCategoryIcon: String,
-            subCategoryIcon: String,
-            
-
-            subCategoryList: [{
-                strength_id:{
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: 'HumanR',
-                },
-                
-              
-            }]
-        }
-    ],
-
-
-
-
-})
-
-
-categorySchema.virtual('id').get(function () {
-    return this._id.toHexString();
+const subcategorySchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  description: String,
+  uniqueSubCategoryName: {
+    type: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
-categorySchema.set('toJSON', {
-    virtuals: true,
+const categorySchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  description: String,
+  uniqueCategoryName: {
+    type: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  subcategories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Subcategory' }], // Array of ObjectIds referencing Subcategory model
 });
 
-exports.Category = mongoose.model('Category', categorySchema);
+const Subcategory = mongoose.model('Subcategory', subcategorySchema);
+const Category = mongoose.model('Category', categorySchema);
+
+module.exports = { Category, Subcategory };
+

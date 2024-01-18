@@ -31,7 +31,7 @@ app.use(errorHandler);
 
 
 //Routes
-const categoriesRoutes = require('./routes/categories');
+const categoriesRoutes = require('./routes/categorie');
 const productsRoutes = require('./routes/products');
 const usersRoutes = require('./routes/users');
 const ordersRoutes = require('./routes/orders');
@@ -50,10 +50,16 @@ const departmentRoutess = require('./routes/departments');
 const designationRoutess = require('./routes/designations');
 const quiz_categoryRoutess = require('./routes/quiz-categorys');
 const quizRoutess = require('./routes/quizs');
+const certificateRoutess = require('./routes/certificates');
+const assessmentRoutess = require('./routes/psychometricassessments');
+const expert =require('./routes/expert');
+const assignmentRoutes =require('./routes/assignments');
+const expertReportRoutes =require('./routes/expertReports');
+const demoRoutes =require('./routes/demo');
 
 const api = process.env.API_URL;
 
- var port = process.env.PORT || 4000;
+ var port = process.env.PORT || 5000;
 
 app.use(`${api}/categories`, categoriesRoutes);
 app.use(`${api}/products`, productsRoutes);
@@ -74,10 +80,12 @@ app.use(`${api}/department`, departmentRoutess);
 app.use(`${api}/designation`, designationRoutess);
 app.use(`${api}/quiz_category`, quiz_categoryRoutess);
 app.use(`${api}/quiz`, quizRoutess);
-
-
-
-
+app.use(`${api}/certificate`, certificateRoutess);
+app.use(`${api}/assessment`, assessmentRoutess);
+app.use(`${api}/expert`, expert);
+app.use(`${api}/assignments`, assignmentRoutes);
+app.use(`${api}/expert-report`, expertReportRoutes);
+app.use(`${api}/demo`, demoRoutes);
 
 //Database
 mongoose

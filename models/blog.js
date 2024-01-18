@@ -5,7 +5,7 @@ const blogSchema = mongoose.Schema({
         type: String,
         required: true,
     },
- 
+    uniquename: String,
     description: {
         type: String,
         required: true

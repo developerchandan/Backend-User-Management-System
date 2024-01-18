@@ -49,13 +49,19 @@ const uploadOptions = multer({ storage: storage });
 
 
 router.get('/getgalleryList', async (req, res) => {
-    const gallery = await Gallery.find();
-      
-    if (!gallery) {
-        res.status(500).json({ message: 'The gallery list not found.' })
+    try {
+      const gallery = await Gallery.find().sort({ dateCreated: -1 });
+    
+      if (!gallery) {
+        return res.status(404).json({ message: 'The gallery list not found.' });
+      }
+    
+      res.status(200).send(gallery);
+    } catch (error) {
+      res.status(500).json({ message: 'Internal server error.' });
     }
-    res.status(200).send(gallery);
-})
+  });
+  
 
 
 router.get('/:id', async (req, res) => {
@@ -70,80 +76,169 @@ router.get('/:id', async (req, res) => {
 
 //@ Add items..
 
-router.post('/addgallery', upload.single('video'), async (req, res) => {
-    console.log("gallery",req.body);
-    let params = {
-        Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
-        Key: req.file.originalname,
-        Body: req.file.buffer,
-    };
+// router.post('/addgallery', upload.single('video'), async (req, res) => {
+//     console.log("gallery",req.body);
+//     let params = {
+//         Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
+//         Key: req.file.originalname,
+//         Body: req.file.buffer,
+//     };
 
-    const file = req.file;
-    if (!file) return res.status(400).send('No video in the request');
+//     const file = req.file;
+//     if (!file) return res.status(400).send('No video in the request');
 
-    const fileName = file.filename;
-    console.log(fileName);
+//     const fileName = file.filename;
+//     console.log(fileName);
 
 
-    let galleryResource = new Gallery({
+//     let galleryResource = new Gallery({
 
-        name: req.body.name,
-        description: req.body.description,
-        richdescription: req.body.richdescription,
+//         name: req.body.name,
+//         description: req.body.description,
+//         richdescription: req.body.richdescription,
         
-    })
-    galleryResource = await galleryResource.save();
+//     })
+//     galleryResource = await galleryResource.save();
 
-    if (!galleryResource)
-        return res.status(400).send('The Gallery cannot be created!')
+//     if (!galleryResource)
+//         return res.status(400).send('The Gallery cannot be created!')
 
+//     s3.upload(params, (err, result) => {
+
+//         if (err) {
+//             console.log('Upload failed')
+//             res.status(500).json({
+//                 message: "Failed to upload file",
+//                 error: err.message,
+//             });
+//         }
+//         else {
+
+//             Gallery.findByIdAndUpdate({ _id: galleryResource._id }, {
+//                 $set: {
+//                     video: result.Location
+//                 }
+//             }).then((data) => {
+
+//                 res.json({ data });}).catch((e) => {
+//                 res.send(e)
+//             })
+//         }
+
+//     })
+
+// })
+
+router.post('/addgallery', upload.single('video'), async (req, res) => {
+  console.log("gallery", req.body);
+  let params = {
+    Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
+    Key: req.file ? req.file.originalname : '',
+    Body: req.file ? req.file.buffer : '',
+  };
+
+  const file = req.file;
+  if (file && !file) return res.status(400).send('No video in the request');
+
+  const fileName = file ? file.filename : '';
+  console.log(fileName);
+
+  let galleryResource = new Gallery({
+    name: req.body.name,
+    description: req.body.description,
+    richdescription: req.body.richdescription,
+    youtubeLink:req.body.youtubeLink,
+    video: file ? result.Location : '',
+  });
+
+  galleryResource = await galleryResource.save();
+
+  if (!galleryResource)
+    return res.status(400).send('The Gallery cannot be created!');
+
+  if (file) {
     s3.upload(params, (err, result) => {
-
-        if (err) {
-            console.log('Upload failed')
-            res.status(500).json({
-                message: "Failed to upload file",
-                error: err.message,
-            });
-        }
-        else {
-
-            Gallery.findByIdAndUpdate({ _id: galleryResource._id }, {
-                $set: {
-                    video: result.Location
-                }
-            }).then((data) => {
-
-                res.json({ data });}).catch((e) => {
-                res.send(e)
-            })
-        }
-
-    })
-
-})
-
-
-
-
-
-
-router.put('/:id', upload.single('image'), async (req, res) => {
-
-    const updateGallery = await Gallery.findByIdAndUpdate(
-        req.params.id,
-        {
-        name: req.body.name,
-        description: req.body.description,
-        richdescription: req.body.richdescription,
-        },
-        { new: true }
-    );
-
-    if (!updateGallery) return res.status(500).send('The Gallery cannot be updated!');
-
-    res.send(updateGallery);
+      if (err) {
+        console.log('Upload failed');
+        res.status(500).json({
+          message: "Failed to upload file",
+          error: err.message,
+        });
+      } else {
+        Gallery.findByIdAndUpdate(
+          { _id: galleryResource._id },
+          {
+            $set: {
+              video: result.Location,
+            },
+          }
+        )
+          .then((data) => {
+            res.json({ data });
+          })
+          .catch((e) => {
+            res.send(e);
+          });
+      }
+    });
+  } else {
+    res.json({ galleryResource });
+  }
 });
+
+router.put('/:id', upload.single('video'), async (req, res) => {
+    let updateFields = {
+      name: req.body.name,
+      description: req.body.description,
+      richdescription: req.body.richdescription,
+      youtubeLink:req.body.youtubeLink,
+    };
+  
+    // Check if a video was provided and update the video field accordingly
+    if (req.file) {
+      updateFields.video = req.file.filename;
+    }
+  
+    const galleryId = req.params.id;
+  
+    // Update the gallery resource
+    Gallery.findByIdAndUpdate(galleryId, updateFields, { new: true })
+      .then(async (updatedGallery) => {
+        if (!updatedGallery) {
+          return res.status(500).send('The Gallery cannot be updated!');
+        }
+  
+        // If a video was provided, upload it to AWS S3
+        if (req.file) {
+          const params = {
+            Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
+            Key: req.file.originalname,
+            Body: req.file.buffer,
+          };
+  
+          try {
+            const uploadResult = await s3.upload(params).promise();
+  
+            // Update the video field with the S3 bucket URL
+            updatedGallery.video = uploadResult.Location;
+            await updatedGallery.save();
+          } catch (error) {
+            console.log('Upload failed:', error);
+            return res.status(500).json({
+              message: 'Failed to upload file',
+              error: error.message,
+            });
+          }
+        }
+  
+        res.json({ updatedGallery });
+      })
+      .catch((error) => {
+        console.error('Error updating gallery:', error);
+        res.status(500).send('An error occurred while updating the gallery.');
+      });
+  });
+  
 
 
 //@ Delete items..

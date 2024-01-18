@@ -19,19 +19,15 @@ const humanResource = mongoose.Schema({
         }
     ],
 
-    category: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Category'
-        }
-    ],
-
-    subCategory: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Category.subCategory'
-        }
-    ],
+    category: {
+        type: [String],
+        default: [],  
+    },
+    subCategory: {
+        type: [String],
+        default: [],  
+      
+    },
 
     description: { type: String },
     richdescription: { type: String },
@@ -60,7 +56,12 @@ const humanResource = mongoose.Schema({
         {
             subcompatency_name: String,
             strength_id:String,
-
+            subCompatencyAnalysis:[
+                {
+                    analysis_name:String,
+                    analysis_range:String,
+                }
+            ],
             subBeahviourList: [
                 {
                     beahviourName: String,
@@ -102,18 +103,22 @@ const humanResource = mongoose.Schema({
                             }]
                         }
                     ],
-                    summary:[
-                        {
-                            title:String,
-                            description:String,
-                            range:String,
-                        }
-                    ]
+                 
                 }
-            ]
-        }
+            ],
+          
+        },
+        
     ],
 
+    summary:[
+        {
+            title:String,
+            description:String,
+            range:String,
+            default:'',
+        }
+    ],
     isFeatured: {
         type: Boolean,
         default: false

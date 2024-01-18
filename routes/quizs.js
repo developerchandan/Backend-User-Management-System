@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { QuizList } = require('../models/quiz');
+const QuizList  = require('../models/quiz');
 const multer = require('multer');
 const { Quiz_Category } = require('../models/quiz-category');
 const AWS = require('aws-sdk');
@@ -56,24 +56,61 @@ const storage = multer.diskStorage({
 const uploadOptions = multer({ storage: storage });
 
 router.get(`/quiz/all`, async (req, res) => {
-    console.log(req.body);
-    const quizLists = await QuizList.find().sort({ name: 1 }).populate('quiz_category');
-
-    if (!quizLists) {
-        res.status(500).json({ success: false });
+    const page = req.query.page ? parseInt(req.query.page) : 1;
+    const limit = 18;
+    const filters = {};
+  
+    // Check if subCategory filter is provided
+    if (req.query.subCategory) {
+        filters.subCategory = { $in: req.query.subCategory.split(',') };
     }
-    res.send(quizLists);
-});
-
-router.get('/:id', async (req, res) => {
-    const quiz = await QuizList.findById(req.params.id)
-        .populate('quiz_category');
-
-    if (!quiz) {
-        res.status(500).json({ message: 'The Quiz with the given ID was not found.' })
+  
+    // Check if categories filter is provided
+    if (req.query.categories) {
+        filters.category = { $in: req.query.categories.split(',') };
     }
-    res.status(200).send(quiz);
-})
+  
+    try {
+        const count = await QuizList.countDocuments(filters);
+        const totalPages = Math.ceil(count / limit);
+  
+        const quizLists = await QuizList.find(filters)
+            .sort({ name: 1 })
+  
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .exec();
+  
+        res.json({
+            currentPage: page,
+            totalPages: totalPages,
+            totalItems: count,
+            quizLists: quizLists
+        });
+    } catch (error) {
+        console.error('Error querying quizLists:', error);
+        res.status(500).send('Internal Server Error');
+    }
+  });
+
+
+
+  router.get('/getquizbyId/:id', async (req, res) => {
+    const quizId = req.params.id;
+  
+    try {
+      const quiz = await QuizList.findById(quizId);
+  
+      if (!quiz) {
+        return res.status(404).json({ message: 'Quiz not found' });
+      }
+  
+      res.json({ quiz });
+    } catch (error) {
+      console.error('Error querying quiz by ID:', error);
+      res.status(500).send('Internal Server Error');
+    }
+  });
 
 //@ Add items..
 
@@ -89,22 +126,20 @@ router.post('/add-quiz', upload.single('image'), async (req, res) => {
     if (!file) return res.status(400).send('No image in the request');
 
     const fileName = file.filename;
-    console.log(fileName);
-    whoid = req.userId;
-    whoemail = req.email
-    console.log("", req.whoid);
+    const mcqsArray = JSON.parse(req.body.mcqs);
 
     let quizResource = new QuizList({
 
         name: req.body.name,
         description: req.body.description,
-        quiz_category:req.body.quiz_category,
-        email: req.body.email,
+        category: req.body.category.split(','),
+        subCategory: req.body.subCategory.split(','),
+        mcqs: mcqsArray,
         richdescription: req.body.richdescription,
         isFeatured: req.body.isFeatured,
         isHomeFeatured: req.body.isHomeFeatured,
-        owner: whoid,
-        owneremail: whoemail
+        status:req.body.status,
+       
     })
     quizResource = await quizResource.save();
 
@@ -139,8 +174,8 @@ router.post('/add-quiz', upload.single('image'), async (req, res) => {
 
 })
 
-router.post('/getlistdata', async (req, res) => {
-    QuizList.find({ email: req.body.email }).populate('quiz_category').then((result) => {
+router.get('/getlistdata', async (req, res) => {
+    QuizList.find().then((result) => {
         res.send({ data: result, status: 'success' })
     }).catch((e) => {
         res.send(e);
@@ -175,13 +210,20 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     }
 
     updatedQuiz.name = req.body.name;
-    updatedQuiz.quiz_category = req.body.quiz_category;
+    updatedQuiz.category = req.body.category.split(',');
+    updatedQuiz.subCategory = req.body.subCategory.split(',');
     updatedQuiz.description = req.body.description;
     updatedQuiz.email = req.body.email;
     updatedQuiz.isFeatured = req.body.isFeatured;
     updatedQuiz.isHomeFeatured = req.body.isHomeFeatured;
     updatedQuiz.richdescription = req.body.richdescription;
 
+      // Handle MCQs
+      if (req.body.mcqs) {
+        const mcqsArray = JSON.parse(req.body.mcqs);
+        updatedQuiz.mcqs = mcqsArray;
+    }
+    
     try {
         const quiz = await QuizList.findByIdAndUpdate(req.params.id, updatedQuiz, { new: true });
         res.send(quiz);
@@ -191,6 +233,47 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     }
 });
 
+
+// Delete Quiz API
+router.delete('/delete-quiz/:id', async (req, res) => {
+    const quizId = req.params.id;
+  
+    try {
+      // Find quiz by ID
+      const quiz = await QuizList.findById(quizId);
+  
+      if (!quiz) {
+        return res.status(404).json({ message: 'Quiz not found' });
+      }
+  
+      // Delete quiz from MongoDB
+      const deletedQuiz = await QuizList.findByIdAndDelete(quizId);
+  
+      if (!deletedQuiz) {
+        return res.status(500).json({ message: 'Failed to delete quiz from database' });
+      }
+  
+      // Delete image from S3
+      const s3Params = {
+        Bucket: process.env.AWS_BUCKET_SUDAKSHTA,
+        Key: quiz.image.split('/').pop(), // Extract the filename from the image URL
+      };
+  
+      s3.deleteObject(s3Params, (err, data) => {
+        if (err) {
+          console.error('Failed to delete image from S3:', err);
+          return res.status(500).json({ message: 'Failed to delete image from S3' });
+        }
+  
+        console.log('Image deleted from S3:', data);
+        res.json({ message: 'Quiz and associated image deleted successfully' });
+      });
+    } catch (error) {
+      console.error('Error during quiz deletion:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
 router.delete('/:id', async (req, res) => {
     try {
         const quiz = await QuizList.findById(req.params.id);
@@ -226,6 +309,7 @@ router.delete('/:id', async (req, res) => {
 //Add Question Section
 
 router.post('/addquestion', async (req, res) => {
+    console.log(req.body);
     // Get the count of all questions in the Question model
     const questionCount = await Question.countDocuments();
   
@@ -246,7 +330,72 @@ router.post('/addquestion', async (req, res) => {
       }
     })
   });
+
+  router.get('/get-questions/:quizid', async (req, res) => {
+    try {
+      const quizid = req.params.quizid;
   
+      const questions = await Question.find({ quizid: quizid });
+  
+      if (questions.length === 0) {
+        return res.status(404).json({ message: 'No questions found for the specified quiz ID.' });
+      }
+  
+      res.status(200).json({ questions });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ message: 'An error occurred while fetching the questions.' });
+    }
+  });
+  
+  router.put('/updatequestion/:questionId', async (req, res) => {
+    const questionId = req.params.questionId;
+    const { quizid, questionText, answer, options } = req.body;
+    const updateObj = { quizid, questionText, answer, options };
+  
+    // Find the question by its ID and update it
+    Question.findByIdAndUpdate(questionId, updateObj, { new: true }, (error, updatedQuestion) => {
+      if (error) {
+        console.log(error);
+        res.json({ msg: "some error!" });
+      } else {
+        res.status(200).json({ message: "Question updated!", updatedQuestion });
+      }
+    });
+  });
+  
+  router.delete('/deletequestion/:id', async (req, res) => {
+    try {
+      const deletedQuestion = await Question.findByIdAndDelete(req.params.id);
+      if (!deletedQuestion) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+      res.status(200).json({ message: "Question deleted" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  
+  router.delete('/deletequiz/:id', (req, res) => {
+    var id = req.params.id
+    // console.log(req.params.id);
+    QuizList.deleteOne({ _id: id }, (err) => {
+        if (err) {
+            res.json({ msg: "Somthing went wrong!!" });
+            console.log("err in delete by admin");
+        }
+    })
+    Question.deleteMany({ quizid: id }, (err) => {
+        if (err) {
+            res.json({ msg: "Somthing went wrong!!" });
+            console.log("err in delete by admin");
+        }
+    })
+
+    res.status(200).json({ msg: "yes deleted user by admin" })
+});
 
 
 router.get('/getuploadquiz', async (req, res) => {
@@ -351,24 +500,6 @@ router.get(`/get/featured/:count`, async (req, res) => {
     }
     res.send(quizs);
 });
-
-exports.verifyToken = (req, res, next) => {
-    if (!req.headers.authorization) {
-        return res.status(401).send("unauthorized req")
-    }
-    let token = req.headers.authorization.split(' ')[1]
-    // console.log(token);  
-    if (token == 'null') {
-        return res.status(401).send("unauthorized req")
-    }
-    let payload = jwt.verify(token, 'secret')
-    if (!payload) {
-        return res.status(401).send("unauthorized req")
-    }
-    req.userId = payload.subject
-    req.email = payload.email;
-    next()
-}
 
 
 module.exports = router;

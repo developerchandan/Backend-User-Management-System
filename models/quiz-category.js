@@ -1,25 +1,36 @@
 const mongoose = require('mongoose');
 
-const quizCategorySchema = mongoose.Schema({
-    name: {
-        type: String,
-
-    },
-    icon: {
-        type: String,
-    },
-    color: {
-        type: String,
-    }
-})
-
-
-quizCategorySchema.virtual('id').get(function () {
-    return this._id.toHexString();
+const subcategorySchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  description: String,
+  uniqueSubCategoryName: {
+    type: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
-quizCategorySchema.set('toJSON', {
-    virtuals: true,
+const categorySchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  description: String,
+  uniqueCategoryName: {
+    type: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  subcategories: [subcategorySchema], // Embedding subcategorySchema within the category schema
 });
 
-exports.Quiz_Category = mongoose.model('Quiz_Category', quizCategorySchema);
+const QuizCategory = mongoose.model('QuizCategory', categorySchema);
+
+module.exports = { QuizCategory };
