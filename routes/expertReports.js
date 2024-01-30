@@ -3,12 +3,15 @@ const router = express.Router();
 const ExpertReport = require('../models/expertReport');
 
 
-router.get('/get-expert-reports/:userId', async (req, res) => {
+router.get('/get-expert-reports/:userId/:psychometricId', async (req, res) => {
     try {
       const userId = req.params.userId;
+      const psychometricId = req.params.psychometricId;
   
-      // Find expert reports by userId
-      const expertReports = await ExpertReport.find({ userId });
+      // Find expert reports by userId and psychometricId
+      const expertReports = await ExpertReport.find({ userId, psychometricId })
+        .sort({ createdAt: -1 })
+        .limit(1);
   
       res.status(200).json({ expertReports });
     } catch (error) {
@@ -16,14 +19,18 @@ router.get('/get-expert-reports/:userId', async (req, res) => {
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });
+  
 
 router.post('/submit-expert-report', async (req, res) => {
     
     try {
-        const { userid, expertreport } = req.body;
+        const { userid, expertreport, psychometricId,overallFeedback,advice } = req.body;
 
         const newReport = new ExpertReport({
             userId: userid,
+            psychometricId: psychometricId,
+            overallFeedback: overallFeedback,
+            advice: advice,
             expertReports: [] 
         });
 

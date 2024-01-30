@@ -7,26 +7,35 @@ const questionSchema = mongoose.Schema({
     },
     answer: {
         type: String,
-        
+       
     },
     options: {
         type: Array,
         default: [],
     },
+    explanation: {
+        type: String,
+    },
+});
+
+const topicSchema = mongoose.Schema({
+    name: {
+        type: String,
+       
+    },
+    mcqs: [questionSchema],
 });
 
 const quizResourceSchema = mongoose.Schema(
     {
         name: {
             type: String,
-            required: true,
+           
         },
-
         image: {
             type: String,
             default: '',
         },
-
         category: {
             type: [String],
             default: [],
@@ -35,7 +44,7 @@ const quizResourceSchema = mongoose.Schema(
             type: [String],
             default: [],
         },
-        mcqs: [questionSchema],
+        topics: [topicSchema],
         description: {
             type: String,
         },

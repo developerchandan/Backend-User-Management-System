@@ -2,7 +2,7 @@ const {Assessment} = require('../models/psychometricassessment');
 const express = require('express');
 const router = express.Router();
 const {UnMask} = require('../models/unmask');
-
+const moment = require('moment');
 
 router.get('/all-unmask-entries', async (req, res) => {
   try {
@@ -126,6 +126,45 @@ router.delete('/:id', (req, res)=>{
     })
 })
 
+
+router.get('/get-unmask-reports/:userId/:psychometricId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const psychometricId = req.params.psychometricId;
+
+    // Find expert reports by userId and psychometricId
+    const userUnmaskReports = await UnMask.find({ userId, psychometricId })
+      .sort({ createdAt: -1 })
+
+
+    res.status(200).json({ userUnmaskReports });
+  } catch (error) {
+    console.error('Error fetching expert reports:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+
+router.get('/get-unmask/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // Find UnMask data based on userId
+    const unmaskData = await UnMask.findOne({ userId: userId })
+    .sort({ createdAt: -1 }) ;
+    
+
+    if (!unmaskData) {
+      return res.status(404).json({ error: 'UnMask data not found for the specified userId' });
+    }
+
+    res.status(200).json(unmaskData);
+  } catch (err) {
+    console.error('Error retrieving UnMask data:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 // POST API to create a new UnMask entry
 router.post('/add-unmask', async (req, res) => {

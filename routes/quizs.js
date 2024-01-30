@@ -112,6 +112,47 @@ router.get(`/quiz/all`, async (req, res) => {
     }
   });
 
+
+  router.get('/get-question/:id', async (req, res) => {
+    const quizId = req.params.id;
+
+    try {
+        const quizResource = await QuizList.findById(quizId);
+
+        if (!quizResource) {
+            return res.status(404).json({ error: 'Quiz resource not found' });
+        }
+
+        // Extracting questions with quiz name, topic name, and question text from topics
+        const allQuestions = quizResource.topics.reduce((questions, topic, index) => {
+            const questionsWithDetails = topic.mcqs.map((question, questionIndex) => {
+                return {
+                    topicName: topic.name,
+                    questionText: question.questionText,
+                    ...question.toObject(), // Convert Mongoose document to plain JavaScript object
+                };
+            });
+
+            // Include quizName only once for the first topic
+            if (index === 0) {
+                questionsWithDetails[0].quizName = quizResource.name;
+            }
+
+            return questions.concat(questionsWithDetails);
+        }, []);
+
+        res.status(200).json({
+            quizName: quizResource.name,
+            questions: allQuestions,
+        });
+    } catch (error) {
+        res.status(500).json({ error: `Error fetching questions: ${error.message}` });
+    }
+});
+
+
+
+
 //@ Add items..
 
 router.post('/add-quiz', upload.single('image'), async (req, res) => {
@@ -126,7 +167,7 @@ router.post('/add-quiz', upload.single('image'), async (req, res) => {
     if (!file) return res.status(400).send('No image in the request');
 
     const fileName = file.filename;
-    const mcqsArray = JSON.parse(req.body.mcqs);
+    const topicsArray = JSON.parse(req.body.topics);
 
     let quizResource = new QuizList({
 
@@ -134,7 +175,7 @@ router.post('/add-quiz', upload.single('image'), async (req, res) => {
         description: req.body.description,
         category: req.body.category.split(','),
         subCategory: req.body.subCategory.split(','),
-        mcqs: mcqsArray,
+        topics: topicsArray,
         richdescription: req.body.richdescription,
         isFeatured: req.body.isFeatured,
         isHomeFeatured: req.body.isHomeFeatured,
@@ -219,9 +260,9 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     updatedQuiz.richdescription = req.body.richdescription;
 
       // Handle MCQs
-      if (req.body.mcqs) {
-        const mcqsArray = JSON.parse(req.body.mcqs);
-        updatedQuiz.mcqs = mcqsArray;
+      if (req.body.topics) {
+        const topicsArray = JSON.parse(req.body.topics);
+        updatedQuiz.topics = topicsArray;
     }
     
     try {

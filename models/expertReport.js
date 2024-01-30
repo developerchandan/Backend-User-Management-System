@@ -7,6 +7,13 @@ const expertReportSchema = new mongoose.Schema({
     ref: 'User', 
     required: true
   },
+  psychometricId:{
+    type: Schema.Types.ObjectId, 
+    ref: 'Expert', 
+    required: true
+  },
+  overallFeedback:{type: String},
+  advice:{type: String},
   expertReports: [
     {
       question: { type: String },

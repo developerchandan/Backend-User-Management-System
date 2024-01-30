@@ -11,6 +11,7 @@ const mongoose =require('mongoose');
     ref: 'HumanR',
     
   },
+  attemptCount: { type: Number, default: 0 },
   reportA: {
     type: Object, 
     
