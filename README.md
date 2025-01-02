@@ -41,7 +41,7 @@ This backend API is built using **Node.js** and **Express.js**. It provides the 
    Create a `.env` file in the root directory and configure the following variables:
    ```env
    MONGO_URI=mongodb://<username>:<password>@<host>:<port>/<database>
-   PORT=5000
+   PORT=3000
    ```
 
 4. Start the server:
