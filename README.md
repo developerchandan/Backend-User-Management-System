@@ -130,7 +130,7 @@ project-root/
   routes/
     userRoutes.js   # API routes
   .env              # Environment variables
-  server.js         # Server entry point
+  index.js         # Server entry point
 ```
 
 ## User Model
