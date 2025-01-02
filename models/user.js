@@ -1,92 +1,35 @@
 const mongoose = require('mongoose');
 
-var bcrypt = require('bcrypt');
-const { boolean, string } = require('joi');
 const userSchema = new mongoose.Schema({
-    name: {
-        type: String,
-
-    },
-    email: {
-        type: String,
-        unique: true
-    },
-    passwordHash: {
-        type: String,
-
-    },
-    role: {
-        type: String
-    },
-    phone: {
-        type: String,
-
-    },
-    userHeadline:{
-        type: String,
-        default: ''
-    },
-    profileImage:{
-        type:String,
-        default:''
-    },
-    isAdmin: {
-        type: Boolean,
-        default: false,
-    },
-    street: {
-        type: String,
-        default: ''
-    },
-    apartment: {
-        type: String,
-        default: ''
-    },
-    zip: {
-        type: String,
-        default: ''
-    },
-    city: {
-        type: String,
-        default: ''
-    },
-    country: {
-        type: String,
-        default: ''
-    },
-    userId:{
-        type: String,
-    },
-    assessments: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'PsychometricResult',
-        }
-    ],
-    savePsychometricTestId: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'HumanR',
-        }
-    ],
-
-    otp: String,
-    loginAttempts: { type: Number, default: 0 },
-    lastFailedLoginAttempt: { type: Date, default: null },
-}, { timestamp: true });
-
-userSchema.statics.hashPassword = function hashPassword(passwordHash) {
-    return bcrypt.hashSync(passwordHash, 10);
-}
-
-userSchema.virtual('id').get(function () {
-    return this._id.toHexString();
+  id:{
+    type: String,
+    required: true
+  },
+  name: {
+    type: String,
+    required: [true, 'Name is required'],
+    trim: true,
+  },
+  email: {
+    type: String,
+    required: [true, 'Email is required'],
+    unique: true,
+    match: [/^\S+@\S+\.\S+$/, 'Email is invalid'],
+  },
+  role: {
+    type: String,
+    required: [true, 'Role is required'],
+    enum: ['Admin','Editor', 'Viewer'],
+  },
+  status: {
+    type: String,
+    enum: ['Active', 'Inactive'],
+    default: 'Active',
+  },
+  
+},
+{
+  timestamps: true
 });
 
-userSchema.set('toJSON', {
-    virtuals: true,
-});
-
-
-exports.User = mongoose.model('User', userSchema);
-exports.userSchema = userSchema;
+module.exports = mongoose.model('User', userSchema);
